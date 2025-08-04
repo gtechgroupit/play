@@ -17,78 +17,115 @@
             -moz-user-select: none;
             -ms-user-select: none;
             user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: fixed;
         }
 
         body {
             background: #000;
             color: #0f0;
             font-family: 'Courier New', monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            overflow: hidden;
             touch-action: none;
         }
 
         #gameWrapper {
-            position: relative;
-            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             background: radial-gradient(ellipse at center, #001100 0%, #000000 100%);
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         }
 
         #gameContainer {
             position: relative;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: 2/3;
+            width: 90vw;
+            height: 90vh;
+            max-width: 500px;
+            max-height: 750px;
             border: 3px solid #0f0;
             box-shadow: 
                 0 0 30px #0f0, 
                 inset 0 0 30px rgba(0, 255, 0, 0.2),
                 0 0 100px rgba(0, 255, 0, 0.3);
             background: #000;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Responsive per diversi dispositivi */
+        /* Portrait mode (default) */
+        @media (orientation: portrait) {
+            #gameContainer {
+                width: min(90vw, 500px);
+                height: min(85vh, 750px);
+            }
+        }
+
+        /* Landscape mode */
         @media (orientation: landscape) {
             #gameContainer {
-                aspect-ratio: auto;
-                height: 90vh;
-                width: auto;
+                width: min(60vh, 500px);
+                height: min(90vh, 750px);
             }
         }
 
-        /* Samsung Galaxy Fold */
-        @media (min-width: 280px) and (max-width: 320px) {
+        /* Small phones (Galaxy Fold closed, iPhone SE) */
+        @media (max-width: 375px) and (max-height: 700px) {
             #gameContainer {
+                width: 95vw;
+                height: 80vh;
                 border-width: 2px;
             }
-        }
-
-        /* Tablet e iPad */
-        @media (min-width: 768px) and (max-width: 1024px) {
-            #gameContainer {
-                max-width: 600px;
+            
+            #gameUI {
+                padding: 1vw !important;
+                font-size: 10px !important;
+            }
+            
+            .ui-panel {
+                padding: 0.3em 0.6em !important;
             }
         }
 
-        /* Desktop */
-        @media (min-width: 1025px) {
+        /* Tablets and iPads */
+        @media (min-width: 768px) and (min-height: 1000px) {
             #gameContainer {
-                max-width: 500px;
-                max-height: 750px;
+                width: min(60vw, 500px);
+                height: min(80vh, 750px);
             }
+        }
+
+        /* Large screens */
+        @media (min-width: 1200px) {
+            #gameContainer {
+                width: 500px;
+                height: 750px;
+            }
+        }
+
+        #canvasWrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
         }
 
         #gameCanvas {
-            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
+            display: block;
             image-rendering: crisp-edges;
             image-rendering: -moz-crisp-edges;
             image-rendering: -webkit-crisp-edges;
@@ -243,46 +280,63 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 20vh;
+            height: 150px;
             display: none;
             z-index: 15;
+            background: linear-gradient(to top, rgba(0, 17, 0, 0.8), transparent);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         @media (hover: none) and (pointer: coarse) {
             #touchControls {
-                display: block;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                padding: 20px;
             }
             
             #gameCanvas {
                 cursor: auto;
             }
+            
+            #gameContainer {
+                padding-bottom: 150px;
+            }
         }
 
-        .touch-area {
-            position: absolute;
-            bottom: 10px;
+        .touch-button {
             width: 80px;
             height: 80px;
-            border: 3px solid rgba(0, 255, 0, 0.3);
+            border: 3px solid rgba(0, 255, 0, 0.5);
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(0, 255, 0, 0.1), transparent);
+            background: radial-gradient(circle, rgba(0, 255, 0, 0.2), transparent);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            transition: all 0.1s;
+            touch-action: none;
         }
 
-        .touch-area.left {
-            left: 20px;
+        .touch-button:active {
+            transform: scale(0.9);
+            background: radial-gradient(circle, rgba(0, 255, 0, 0.4), transparent);
+            border-color: #0f0;
         }
 
-        .touch-area.right {
-            right: 20px;
-        }
-
-        .touch-area.fire {
-            left: 50%;
-            transform: translateX(-50%);
+        .touch-button.fire {
             width: 100px;
             height: 100px;
-            background: radial-gradient(circle, rgba(255, 0, 0, 0.2), transparent);
-            border-color: rgba(255, 0, 0, 0.5);
+            background: radial-gradient(circle, rgba(255, 0, 0, 0.3), transparent);
+            border-color: rgba(255, 0, 0, 0.6);
+            color: #ff0;
+        }
+
+        .touch-button.fire:active {
+            background: radial-gradient(circle, rgba(255, 0, 0, 0.5), transparent);
+            border-color: #ff0000;
         }
 
         /* Effetto scanlines migliorato */
@@ -362,7 +416,9 @@
 <body>
     <div id="gameWrapper">
         <div id="gameContainer">
-            <canvas id="gameCanvas"></canvas>
+            <div id="canvasWrapper">
+                <canvas id="gameCanvas"></canvas>
+            </div>
             
             <div id="gameUI">
                 <div class="ui-panel">
@@ -401,9 +457,9 @@
             
             <!-- Touch controls per mobile -->
             <div id="touchControls">
-                <div class="touch-area left" data-direction="left"></div>
-                <div class="touch-area right" data-direction="right"></div>
-                <div class="touch-area fire" data-action="fire"></div>
+                <button class="touch-button" data-direction="left">◀</button>
+                <button class="touch-button fire" data-action="fire">🔥</button>
+                <button class="touch-button" data-direction="right">▶</button>
             </div>
         </div>
     </div>
@@ -413,25 +469,42 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         
+        // Canvas dimensions
+        const GAME_WIDTH = 400;
+        const GAME_HEIGHT = 600;
+        
         // Responsive canvas setup
         let canvasScale = 1;
         function resizeCanvas() {
-            const container = document.getElementById('gameContainer');
-            const rect = container.getBoundingClientRect();
+            const wrapper = document.getElementById('canvasWrapper');
+            const rect = wrapper.getBoundingClientRect();
             
             // Set canvas internal size
-            canvas.width = 400;
-            canvas.height = 600;
+            canvas.width = GAME_WIDTH;
+            canvas.height = GAME_HEIGHT;
             
-            // Scale canvas to fit container
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
+            // Calculate scale to fit container
+            const scaleX = rect.width / GAME_WIDTH;
+            const scaleY = rect.height / GAME_HEIGHT;
+            canvasScale = Math.min(scaleX, scaleY);
             
-            canvasScale = rect.width / 400;
+            // Apply scale transform
+            canvas.style.width = (GAME_WIDTH * canvasScale) + 'px';
+            canvas.style.height = (GAME_HEIGHT * canvasScale) + 'px';
+            
+            // Center canvas in wrapper
+            canvas.style.position = 'absolute';
+            canvas.style.left = ((rect.width - GAME_WIDTH * canvasScale) / 2) + 'px';
+            canvas.style.top = ((rect.height - GAME_HEIGHT * canvasScale) / 2) + 'px';
         }
         
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        window.addEventListener('orientationchange', () => {
+            setTimeout(resizeCanvas, 100);
+        });
+        
+        // Call resize on load
+        setTimeout(resizeCanvas, 100);
         
         // Game state
         let gameRunning = false;
@@ -443,8 +516,8 @@
         
         // Player (Firewall)
         const player = {
-            x: canvas.width / 2,
-            y: canvas.height - 80,
+            x: GAME_WIDTH / 2,
+            y: GAME_HEIGHT - 80,
             width: 60,
             height: 40,
             health: 100,
@@ -527,8 +600,8 @@
             stars = [];
             for (let i = 0; i < 100; i++) {
                 stars.push({
-                    x: Math.random() * canvas.width,
-                    y: Math.random() * canvas.height,
+                    x: Math.random() * GAME_WIDTH,
+                    y: Math.random() * GAME_HEIGHT,
                     size: Math.random() * 2,
                     speed: 0.5 + Math.random() * 1.5,
                     brightness: Math.random()
@@ -546,7 +619,7 @@
         }
         
         // Input handling
-        let inputX = canvas.width / 2;
+        let inputX = GAME_WIDTH / 2;
         let firePressed = false;
         
         // Mouse controls
@@ -562,50 +635,73 @@
         
         // Touch controls
         if (isMobile) {
-            let touchX = null;
+            let touchActive = false;
+            let moveDirection = 0; // -1 left, 0 none, 1 right
             
+            // Canvas touch for direct control
             canvas.addEventListener('touchstart', (e) => {
                 e.preventDefault();
                 const touch = e.touches[0];
                 const rect = canvas.getBoundingClientRect();
-                touchX = (touch.clientX - rect.left) / canvasScale;
-                firePressed = true;
+                const x = (touch.clientX - rect.left) / canvasScale;
+                inputX = x;
+                touchActive = true;
             });
             
             canvas.addEventListener('touchmove', (e) => {
                 e.preventDefault();
-                if (e.touches.length > 0) {
+                if (e.touches.length > 0 && touchActive) {
                     const touch = e.touches[0];
                     const rect = canvas.getBoundingClientRect();
-                    touchX = (touch.clientX - rect.left) / canvasScale;
-                    inputX = touchX;
+                    const x = (touch.clientX - rect.left) / canvasScale;
+                    inputX = x;
                 }
             });
             
             canvas.addEventListener('touchend', () => {
-                firePressed = false;
+                touchActive = false;
             });
             
             // Virtual button controls
-            const touchAreas = document.querySelectorAll('.touch-area');
-            touchAreas.forEach(area => {
-                area.addEventListener('touchstart', (e) => {
+            const touchButtons = document.querySelectorAll('.touch-button');
+            
+            touchButtons.forEach(button => {
+                // Touch start
+                button.addEventListener('touchstart', (e) => {
                     e.preventDefault();
-                    if (area.dataset.direction === 'left') {
-                        inputX = Math.max(30, player.x - 30);
-                    } else if (area.dataset.direction === 'right') {
-                        inputX = Math.min(canvas.width - 30, player.x + 30);
-                    } else if (area.dataset.action === 'fire') {
+                    e.stopPropagation();
+                    
+                    if (button.dataset.direction === 'left') {
+                        moveDirection = -1;
+                    } else if (button.dataset.direction === 'right') {
+                        moveDirection = 1;
+                    } else if (button.dataset.action === 'fire') {
                         firePressed = true;
                     }
                 });
                 
-                area.addEventListener('touchend', () => {
-                    if (area.dataset.action === 'fire') {
+                // Touch end
+                button.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (button.dataset.direction) {
+                        moveDirection = 0;
+                    } else if (button.dataset.action === 'fire') {
                         firePressed = false;
                     }
                 });
+                
+                // Prevent context menu
+                button.addEventListener('contextmenu', (e) => e.preventDefault());
             });
+            
+            // Update input based on button press
+            setInterval(() => {
+                if (moveDirection !== 0) {
+                    inputX = Math.max(30, Math.min(GAME_WIDTH - 30, player.x + moveDirection * 10));
+                }
+            }, 16);
         }
         
         // Enhanced drawing functions
@@ -929,12 +1025,12 @@
         
         function drawBackground() {
             // Clear with gradient
-            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
             bgGradient.addColorStop(0, '#000511');
             bgGradient.addColorStop(0.5, '#001122');
             bgGradient.addColorStop(1, '#000511');
             ctx.fillStyle = bgGradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
             
             // Moving grid
             ctx.strokeStyle = 'rgba(0, 255, 0, 0.05)';
@@ -942,11 +1038,11 @@
             backgroundEffects.forEach(line => {
                 ctx.beginPath();
                 ctx.moveTo(0, line.y);
-                ctx.lineTo(canvas.width, line.y);
+                ctx.lineTo(GAME_WIDTH, line.y);
                 ctx.stroke();
                 
                 line.y += 0.5;
-                if (line.y > canvas.height) line.y = -10;
+                if (line.y > GAME_HEIGHT) line.y = -10;
             });
             
             // Animated stars
@@ -956,9 +1052,9 @@
                 ctx.fillRect(star.x, star.y, star.size, star.size);
                 
                 star.y += star.speed;
-                if (star.y > canvas.height) {
+                if (star.y > GAME_HEIGHT) {
                     star.y = -10;
-                    star.x = Math.random() * canvas.width;
+                    star.x = Math.random() * GAME_WIDTH;
                 }
             });
         }
@@ -1095,7 +1191,7 @@
                 }
                 
                 // Keep enemies in bounds
-                if (enemy.x < enemy.width/2 || enemy.x > canvas.width - enemy.width/2) {
+                if (enemy.x < enemy.width/2 || enemy.x > GAME_WIDTH - enemy.width/2) {
                     enemy.speed *= -1;
                 }
                 
@@ -1106,7 +1202,7 @@
                     return false;
                 }
                 
-                if (enemy.y > canvas.height + enemy.height) {
+                if (enemy.y > GAME_HEIGHT + enemy.height) {
                     player.health -= 5;
                     updateUI();
                     return false;
@@ -1138,7 +1234,7 @@
                     return false;
                 }
                 
-                return powerUp.y < canvas.height + 30;
+                return powerUp.y < GAME_HEIGHT + 30;
             });
         }
         
@@ -1204,7 +1300,7 @@
             const enemyData = enemyTypes[selectedType];
             
             enemies.push({
-                x: Math.random() * (canvas.width - 60) + 30,
+                x: Math.random() * (GAME_WIDTH - 60) + 30,
                 y: -30,
                 ...enemyData,
                 type: selectedType,
@@ -1433,7 +1529,7 @@
             if (player.health <= 30) {
                 // Danger overlay
                 ctx.fillStyle = `rgba(255, 0, 0, ${0.1 * (1 + Math.sin(gameFrame * 0.1))})`;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
             }
             
             gameFrame++;
@@ -1450,7 +1546,7 @@
             
             // Reset player
             player.health = player.maxHealth;
-            player.x = canvas.width / 2;
+            player.x = GAME_WIDTH / 2;
             player.powerUps = { rapidFire: 0, shield: 0, multiShot: 0 };
             
             // Clear arrays
