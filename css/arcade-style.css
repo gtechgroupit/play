@@ -1,0 +1,483 @@
+/* Reset e Base */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Press Start 2P', monospace;
+    background: #0a0a0a;
+    color: #fff;
+    overflow-x: hidden;
+    position: relative;
+    min-height: 100vh;
+}
+
+/* Effetto CRT Scanlines */
+.scanlines {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.03) 2px,
+        rgba(255, 255, 255, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    animation: scanlines 8s linear infinite;
+}
+
+@keyframes scanlines {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 10px; }
+}
+
+/* Header Arcade */
+.arcade-header {
+    text-align: center;
+    padding: 30px 20px;
+    background: linear-gradient(180deg, #1a0033 0%, #0a0a0a 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.neon-sign {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.logo-glow {
+    width: 80px;
+    height: 80px;
+    filter: drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 40px #00ffff);
+    animation: logo-pulse 2s ease-in-out infinite;
+}
+
+@keyframes logo-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* Titolo Arcade con effetto neon */
+.arcade-title {
+    font-size: 3rem;
+    text-transform: uppercase;
+    position: relative;
+    display: inline-block;
+}
+
+.arcade-title .letter {
+    display: inline-block;
+    color: #fff;
+    text-shadow: 
+        0 0 10px #ff00ff,
+        0 0 20px #ff00ff,
+        0 0 30px #ff00ff,
+        0 0 40px #00ffff,
+        0 0 70px #00ffff,
+        0 0 80px #00ffff;
+    animation: neon-flicker 1.5s infinite alternate;
+    animation-delay: calc(var(--i) * 0.1s);
+}
+
+.arcade-title .letter:nth-child(1) { --i: 1; }
+.arcade-title .letter:nth-child(2) { --i: 2; }
+.arcade-title .letter:nth-child(3) { --i: 3; }
+.arcade-title .letter:nth-child(4) { --i: 4; }
+.arcade-title .letter:nth-child(5) { --i: 5; }
+.arcade-title .letter:nth-child(6) { --i: 6; }
+.arcade-title .letter:nth-child(7) { --i: 7; }
+.arcade-title .letter:nth-child(8) { --i: 8; }
+.arcade-title .letter:nth-child(9) { --i: 9; }
+.arcade-title .letter:nth-child(10) { --i: 10; }
+.arcade-title .letter:nth-child(11) { --i: 11; }
+.arcade-title .letter:nth-child(12) { --i: 12; }
+.arcade-title .letter:nth-child(13) { --i: 13; }
+
+@keyframes neon-flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+/* Subtitle Marquee */
+.subtitle-marquee {
+    background: #ff00ff;
+    color: #000;
+    padding: 10px 0;
+    font-size: 0.8rem;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+}
+
+.subtitle-marquee span {
+    display: inline-block;
+    animation: marquee 15s linear infinite;
+}
+
+@keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+}
+
+/* Main Arcade Floor */
+.arcade-floor {
+    min-height: calc(100vh - 200px);
+    padding: 40px 20px;
+    position: relative;
+    background: 
+        radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0a 100%),
+        repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 10px,
+            rgba(255, 0, 255, 0.03) 10px,
+            rgba(255, 0, 255, 0.03) 20px
+        );
+}
+
+/* Games Grid */
+.games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+}
+
+/* Arcade Cabinet Style */
+.arcade-cabinet {
+    background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 
+        0 0 30px rgba(255, 0, 255, 0.3),
+        inset 0 0 20px rgba(0, 255, 255, 0.1);
+    position: relative;
+    transition: all 0.3s ease;
+    animation: cabinet-glow 3s ease-in-out infinite;
+    animation-delay: calc(var(--cabinet-index) * 0.2s);
+}
+
+.arcade-cabinet:nth-child(1) { --cabinet-index: 1; }
+.arcade-cabinet:nth-child(2) { --cabinet-index: 2; }
+.arcade-cabinet:nth-child(3) { --cabinet-index: 3; }
+.arcade-cabinet:nth-child(4) { --cabinet-index: 4; }
+.arcade-cabinet:nth-child(5) { --cabinet-index: 5; }
+.arcade-cabinet:nth-child(6) { --cabinet-index: 6; }
+.arcade-cabinet:nth-child(7) { --cabinet-index: 7; }
+.arcade-cabinet:nth-child(8) { --cabinet-index: 8; }
+.arcade-cabinet:nth-child(9) { --cabinet-index: 9; }
+
+@keyframes cabinet-glow {
+    0%, 100% { box-shadow: 0 0 30px rgba(255, 0, 255, 0.3), inset 0 0 20px rgba(0, 255, 255, 0.1); }
+    50% { box-shadow: 0 0 50px rgba(255, 0, 255, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.2); }
+}
+
+.arcade-cabinet:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 
+        0 10px 40px rgba(255, 0, 255, 0.6),
+        inset 0 0 30px rgba(0, 255, 255, 0.3);
+}
+
+/* Screen Frame */
+.screen-frame {
+    background: #000;
+    border: 3px solid #444;
+    border-radius: 10px;
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+.screen-content {
+    position: relative;
+    background: #111;
+    border-radius: 5px;
+    overflow: hidden;
+    min-height: 200px;
+}
+
+/* Game Preview Animation */
+.game-preview {
+    height: 150px;
+    background: linear-gradient(45deg, #ff00ff, #00ffff, #ffff00, #ff00ff);
+    background-size: 400% 400%;
+    animation: gradient-shift 5s ease infinite;
+    opacity: 0.3;
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Screen Glare Effect */
+.screen-glare {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        45deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.1) 50%,
+        transparent 70%
+    );
+    animation: glare-sweep 3s infinite;
+    pointer-events: none;
+}
+
+@keyframes glare-sweep {
+    0% { transform: translateX(-100%) translateY(-100%); }
+    100% { transform: translateX(100%) translateY(100%); }
+}
+
+/* Game Info */
+.game-info {
+    padding: 15px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.game-info h3 {
+    font-size: 1rem;
+    margin-bottom: 10px;
+    color: #ffff00;
+    text-shadow: 0 0 10px #ffff00;
+}
+
+.game-info p {
+    font-size: 0.6rem;
+    color: #00ffff;
+    line-height: 1.4;
+}
+
+/* Cabinet Controls */
+.cabinet-controls {
+    margin-top: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Play Button */
+.play-button {
+    background: linear-gradient(145deg, #ff0080, #ff00ff);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 25px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.8rem;
+    color: #fff;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+    animation: button-pulse 2s ease-in-out infinite;
+}
+
+@keyframes button-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 255, 0.5); }
+    50% { box-shadow: 0 0 30px rgba(255, 0, 255, 0.8); }
+}
+
+.play-button:hover {
+    transform: scale(1.1);
+    background: linear-gradient(145deg, #ff00ff, #00ffff);
+    box-shadow: 0 0 40px rgba(255, 0, 255, 1);
+}
+
+.play-button:active {
+    transform: scale(0.95);
+}
+
+.play-button span {
+    position: relative;
+    z-index: 1;
+}
+
+.play-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.play-button:hover::before {
+    left: 100%;
+}
+
+/* Coin Slot */
+.coin-slot {
+    font-size: 0.6rem;
+    color: #ffff00;
+    text-shadow: 0 0 5px #ffff00;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* Neon Strips Decoration */
+.neon-strips {
+    position: fixed;
+    width: 10px;
+    height: 100%;
+    background: linear-gradient(to bottom, #ff00ff, #00ffff, #ffff00);
+    opacity: 0.5;
+    filter: blur(10px);
+}
+
+.neon-strips.left {
+    left: 0;
+    animation: neon-pulse-left 3s ease-in-out infinite;
+}
+
+.neon-strips.right {
+    right: 0;
+    animation: neon-pulse-right 3s ease-in-out infinite;
+}
+
+@keyframes neon-pulse-left {
+    0%, 100% { opacity: 0.3; transform: scaleX(1); }
+    50% { opacity: 0.7; transform: scaleX(1.5); }
+}
+
+@keyframes neon-pulse-right {
+    0%, 100% { opacity: 0.3; transform: scaleX(1); }
+    50% { opacity: 0.7; transform: scaleX(1.5); }
+}
+
+/* Floor Pattern */
+.floor-pattern {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100px;
+    background: repeating-linear-gradient(
+        90deg,
+        #1a1a1a,
+        #1a1a1a 50px,
+        #2a2a2a 50px,
+        #2a2a2a 100px
+    );
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* Footer */
+.arcade-footer {
+    background: #1a0033;
+    padding: 20px;
+    text-align: center;
+    border-top: 3px solid #ff00ff;
+    position: relative;
+}
+
+.arcade-footer p {
+    font-size: 0.7rem;
+    margin-bottom: 10px;
+}
+
+.arcade-footer a {
+    color: #00ffff;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.arcade-footer a:hover {
+    color: #ffff00;
+    text-shadow: 0 0 10px #ffff00;
+}
+
+/* High Score Ticker */
+.high-score-ticker {
+    font-size: 0.6rem;
+    color: #ffff00;
+    margin-top: 10px;
+}
+
+#ticker-content {
+    animation: marquee 30s linear infinite;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .arcade-title {
+        font-size: 2rem;
+    }
+    
+    .games-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+    
+    .neon-sign {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .logo-glow {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* Glitch Effect (random) */
+@keyframes glitch {
+    0%, 100% { 
+        text-shadow: 
+            0.05em 0 0 #00fffc,
+            -0.05em -0.025em 0 #fc00ff,
+            0.025em 0.05em 0 #fffc00;
+    }
+    15% {
+        text-shadow: 
+            0.05em 0 0 #00fffc,
+            -0.05em -0.025em 0 #fc00ff,
+            0.025em 0.05em 0 #fffc00;
+    }
+    16% {
+        text-shadow: 
+            -0.05em -0.025em 0 #00fffc,
+            0.025em 0.025em 0 #fc00ff,
+            -0.05em -0.05em 0 #fffc00;
+    }
+}
+
+/* Extra CRT Effect */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
+    z-index: 9998;
+}
