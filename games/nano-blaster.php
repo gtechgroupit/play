@@ -1,5 +1,31 @@
-/* Responsive adjustments */
-        @media (max-width: <?php
+function resetGame() {
+            score = 0;
+            lives = 3;
+            wave = 1;
+            enemies = [];
+            bullets = [];
+            particles = [];
+            powerUps = [];
+            floatingTexts = [];
+            achievementQueue = [];
+            waveEnemyCount = 5;
+            enemiesKilledInWave = 0;
+            bossSpawned = false;
+            combo = 0;
+            comboTimer = 0;
+            maxCombo = 0;
+            totalKills = 0;
+            powerUpsCollected = 0;
+            totalShotsFired = 0;
+            totalShotsHit = 0;
+            waveStartLives = 3;
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            player.dx = 0;
+            player.dy = 0;
+            player.rapidFire = 0;
+            player.tripleShot = 0;
+      <?php
 /**
  * Nano Blaster - G Tech Arcade
  * Shooter survival game in microelectronic environment
@@ -39,7 +65,7 @@
             cursor: crosshair;
         }
         
-        #startScreen, #gameOverScreen {
+        #startScreen, #gameOverScreen, #achievementsScreen {
             position: absolute;
             top: 0;
             left: 0;
@@ -166,12 +192,35 @@
             pointer-events: auto;
         }
         
-        /* Responsive adjustments */
+        #pauseButton {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 255, 204, 0.2);
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+            color: #00ffcc;
+            font-size: 20px;
+            display: none;
+            z-index: 10;
+            cursor: pointer;
+            text-align: center;
+            line-height: 36px;
+        }
+        
+        #pauseButton:active {
+            background: rgba(0, 255, 204, 0.4);
+        }
+        
         @media (max-width: 768px) {
             h1 { font-size: 2em; }
             .button { padding: 12px 30px; font-size: 1em; }
-            #score, #lives { font-size: 1.2em; }
-            #wave { font-size: 1em; }
+            #score { font-size: 1.2em; left: 70px; }
+            #lives { font-size: 1.2em; }
+            #wave { font-size: 1em; left: 70px; }
+            #highScore { font-size: 1em; top: 60px; }
         }
         
         /* Landscape mobile optimization */
@@ -214,27 +263,67 @@
     <canvas id="gameCanvas"></canvas>
     
     <!-- UI Elements -->
+    <div id="pauseButton" onclick="togglePause()">⏸</div>
     <div id="score">Score: 0</div>
     <div id="lives">Lives: 3</div>
     <div id="wave">Wave: 1</div>
-    <div id="highScore" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: #ffcc00; font-size: 1.2em; text-shadow: 0 0 10px #ffcc00; z-index: 5;">High Score: 0</div>
+    <div id="powerUpIndicators" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 5;">
+        <div id="rapidFireIndicator" style="display: none; padding: 5px 10px; background: rgba(255, 255, 0, 0.3); border: 2px solid #ffff00; border-radius: 5px; color: #ffff00; font-size: 0.9em;">⚡ RAPID</div>
+        <div id="tripleShotIndicator" style="display: none; padding: 5px 10px; background: rgba(0, 255, 255, 0.3); border: 2px solid #00ffff; border-radius: 5px; color: #00ffff; font-size: 0.9em;">☆ TRIPLE</div>
+        <div id="shieldIndicator" style="display: none; padding: 5px 10px; background: rgba(255, 0, 255, 0.3); border: 2px solid #ff00ff; border-radius: 5px; color: #ff00ff; font-size: 0.9em;">◯ SHIELD</div>
+    </div>
     
     <!-- Start Screen -->
     <div id="startScreen">
         <h1>NANO BLASTER</h1>
         <p style="color: #ffcc00; margin-bottom: 20px;">Defend the chip from nano-virus invasion!</p>
         <button class="button" onclick="startGame()">START GAME</button>
-        <p style="color: #aaa; margin-top: 40px; font-size: 0.9em;">
-            Desktop: WASD/Arrows + Mouse<br>
-            Mobile: Touch Controls
-        </p>
+        <button class="button" style="background: #aa00ff; margin-top: 10px;" onclick="showAchievements()">ACHIEVEMENTS</button>
+        <div style="margin-top: 40px; max-width: 600px; text-align: left; color: #aaa; font-size: 0.9em;">
+            <p style="text-align: center; margin-bottom: 20px;">
+                <strong style="color: #00ffcc;">CONTROLS</strong><br>
+                Desktop: WASD/Arrows + Mouse (P to pause)<br>
+                Mobile: Touch Controls
+            </p>
+            <p style="text-align: center;">
+                <strong style="color: #00ffcc;">POWER-UPS</strong><br>
+                <span style="color: #00ff00;">❤️ Health</span> • 
+                <span style="color: #ffff00;">⚡ Rapid Fire</span> • 
+                <span style="color: #00ffff;">☆ Triple Shot</span><br>
+                <span style="color: #ff00ff;">◯ Shield</span> • 
+                <span style="color: #ff6600;">✦ Screen Bomb</span>
+            </p>
+            <p style="text-align: center; margin-top: 20px; color: #ff3344;">
+                <strong>⚠️ BOSS every 5 waves!</strong>
+            </p>
+        </div>
+    </div>
+    
+    <!-- Achievements Screen -->
+    <div id="achievementsScreen" style="display: none;">
+        <h1 style="color: #ffcc00;">ACHIEVEMENTS</h1>
+        <div id="achievementsList" style="max-width: 600px; margin: 20px auto;">
+            <!-- Achievements will be populated here -->
+        </div>
+        <button class="button" onclick="hideAchievements()">BACK</button>
     </div>
     
     <!-- Game Over Screen -->
     <div id="gameOverScreen" style="display: none;">
         <h1>GAME OVER</h1>
         <p style="font-size: 1.5em; color: #ffcc00; margin: 20px 0;">Final Score: <span id="finalScore">0</span></p>
+        <div style="background: rgba(0, 0, 0, 0.5); padding: 20px; border-radius: 10px; margin: 20px; max-width: 400px;">
+            <h3 style="color: #00ffcc; margin-bottom: 15px;">STATISTICS</h3>
+            <div style="text-align: left; color: #aaa;">
+                <p>Waves Survived: <span id="statWaves" style="color: #ffcc00; float: right;">0</span></p>
+                <p>Total Kills: <span id="statKills" style="color: #ffcc00; float: right;">0</span></p>
+                <p>Max Combo: <span id="statCombo" style="color: #ffcc00; float: right;">0</span></p>
+                <p>Power-ups Collected: <span id="statPowerups" style="color: #ffcc00; float: right;">0</span></p>
+                <p>Accuracy: <span id="statAccuracy" style="color: #ffcc00; float: right;">0%</span></p>
+            </div>
+        </div>
         <button class="button" onclick="restartGame()">PLAY AGAIN</button>
+        <button class="button" style="background: #666; margin-top: 10px;" onclick="backToMenu()">MAIN MENU</button>
     </div>
     
     <!-- Mobile Controls -->
@@ -387,17 +476,70 @@
             }
             
             moveSmart() {
-                // Boss AI - predicts player movement
-                const dx = player.x + player.dx * 20 - this.x;
-                const dy = player.y + player.dy * 20 - this.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
+                // Boss AI - advanced patterns
+                const distToPlayer = Math.sqrt((player.x - this.x) ** 2 + (player.y - this.y) ** 2);
                 
-                if (distance > 0) {
-                    this.x += (dx / distance) * this.speed;
-                    this.y += (dy / distance) * this.speed;
+                // Pattern selection based on health
+                if (this.health > 7) {
+                    // Aggressive chase pattern
+                    const dx = player.x + player.dx * 20 - this.x;
+                    const dy = player.y + player.dy * 20 - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 0) {
+                        this.x += (dx / distance) * this.speed;
+                        this.y += (dy / distance) * this.speed;
+                    }
+                } else if (this.health > 4) {
+                    // Circular strafing pattern
+                    this.circleAngle += 0.03;
+                    const targetRadius = 200;
+                    const targetX = player.x + Math.cos(this.circleAngle) * targetRadius;
+                    const targetY = player.y + Math.sin(this.circleAngle) * targetRadius;
+                    
+                    const dx = targetX - this.x;
+                    const dy = targetY - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 0) {
+                        this.x += (dx / distance) * this.speed * 1.5;
+                        this.y += (dy / distance) * this.speed * 1.5;
+                    }
+                    
+                    // Spawn mini viruses occasionally
+                    if (Math.random() < 0.02 && enemies.length < 15) {
+                        enemies.push(new Enemy('virus', this.x, this.y));
+                    }
+                } else {
+                    // Desperate charge pattern
+                    const dx = player.x - this.x;
+                    const dy = player.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Speed increases as health decreases
+                    const desperationSpeed = this.speed * (1.5 + (5 - this.health) * 0.3);
+                    
+                    if (distance > 0) {
+                        this.x += (dx / distance) * desperationSpeed;
+                        this.y += (dy / distance) * desperationSpeed;
+                    }
+                    
+                    // Leave poison trail
+                    if (Math.random() < 0.1) {
+                        particles.push({
+                            x: this.x,
+                            y: this.y,
+                            dx: (Math.random() - 0.5) * 2,
+                            dy: (Math.random() - 0.5) * 2,
+                            radius: 15,
+                            life: 60,
+                            color: '#ff0066',
+                            type: 'poison'
+                        });
+                    }
                 }
                 
-                // Dodge bullets occasionally
+                // Dodge bullets
                 bullets.forEach(bullet => {
                     const bDist = Math.sqrt((bullet.x - this.x) ** 2 + (bullet.y - this.y) ** 2);
                     if (bDist < 100) {
@@ -405,8 +547,8 @@
                         const dodgeY = this.y - bullet.y;
                         const dodgeDist = Math.sqrt(dodgeX * dodgeX + dodgeY * dodgeY);
                         if (dodgeDist > 0) {
-                            this.x += (dodgeX / dodgeDist) * 2;
-                            this.y += (dodgeY / dodgeDist) * 2;
+                            this.x += (dodgeX / dodgeDist) * 3;
+                            this.y += (dodgeY / dodgeDist) * 3;
                         }
                     }
                 });
@@ -415,6 +557,9 @@
             takeDamage(damage) {
                 this.health -= damage;
                 this.hitFlash = 10;
+                
+                // Show damage number
+                showFloatingText(this.x, this.y - this.radius - 10, `-${damage}`, '#ffffff');
                 
                 // Create hit particles
                 for (let i = 0; i < 5; i++) {
@@ -431,6 +576,7 @@
                 
                 // Boss splits into smaller enemies when health is half
                 if (this.type === 'boss' && this.health === 5 && enemies.length < 20) {
+                    showFloatingText(this.x, this.y, 'SPLITTING!', '#ff0066');
                     for (let i = 0; i < 3; i++) {
                         const angle = (Math.PI * 2 / 3) * i;
                         const newX = this.x + Math.cos(angle) * 50;
@@ -601,9 +747,12 @@
             fire: false 
         };
         
-        // Check if mobile device
+        // Check if mobile device and performance settings
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                          (window.innerWidth <= 768 && 'ontouchstart' in window);
+        
+        // Detect low-end device (rough estimation)
+        const isLowEnd = isMobile && (window.innerWidth < 400 || window.devicePixelRatio < 2);
         
         // Canvas resize handler
         function resizeCanvas() {
@@ -628,6 +777,10 @@
         function startGame() {
             document.getElementById('startScreen').style.display = 'none';
             gameState = 'playing';
+            if (isMobile) {
+                document.getElementById('pauseButton').style.display = 'block';
+                document.getElementById('pauseButton').textContent = '⏸';
+            }
             resetGame();
             gameLoop();
         }
@@ -671,7 +824,25 @@
         
         // Main game loop
         function gameLoop() {
-            if (gameState !== 'playing') return;
+            if (gameState !== 'playing') {
+                if (gameState === 'paused') {
+                    // Draw pause screen
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.fillStyle = '#00ffcc';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#00ffcc';
+                    ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+                    
+                    ctx.font = '20px Arial';
+                    ctx.fillText(isMobile ? 'Tap pause button to continue' : 'Press P to continue', canvas.width / 2, canvas.height / 2 + 60);
+                }
+                return;
+            }
             
             // Clear canvas
             ctx.fillStyle = '#080812';
@@ -800,18 +971,56 @@
         function drawCombo() {
             if (combo > 1) {
                 ctx.save();
+                
+                // Combo bar background
+                const barWidth = 200;
+                const barHeight = 10;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = 120;
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+                
+                // Combo bar fill
+                const fillWidth = (comboTimer / 120) * barWidth;
+                const hue = Math.min(combo * 30, 360);
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.fillRect(barX, barY, fillWidth, barHeight);
+                
+                // Combo text
                 ctx.fillStyle = '#ffcc00';
-                ctx.font = 'bold 24px Arial';
+                ctx.font = `bold ${24 + Math.min(combo, 10) * 2}px Arial`;
                 ctx.textAlign = 'center';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 10 + combo;
                 ctx.shadowColor = '#ffcc00';
-                ctx.fillText(`${combo}x COMBO!`, canvas.width / 2, 100);
+                
+                // Shake effect for high combos
+                const shakeX = combo > 5 ? (Math.random() - 0.5) * combo * 0.5 : 0;
+                const shakeY = combo > 5 ? (Math.random() - 0.5) * combo * 0.5 : 0;
+                
+                ctx.fillText(`${combo}x COMBO!`, canvas.width / 2 + shakeX, 100 + shakeY);
+                
+                // Multiplier indicator
+                if (combo > 5) {
+                    ctx.font = 'bold 16px Arial';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(`Score x${combo}`, canvas.width / 2, 140);
+                }
+                
                 ctx.restore();
             }
         }
         
         // Draw microelectronic background with animated elements
         function drawBackground() {
+            // Skip some effects on low-end devices
+            if (!isLowEnd) {
+                // Animated scan line effect
+                const scanY = (Date.now() * 0.1) % canvas.height;
+                ctx.fillStyle = 'rgba(0, 255, 204, 0.05)';
+                ctx.fillRect(0, scanY - 20, canvas.width, 40);
+            }
+            
             // Grid lines
             ctx.strokeStyle = 'rgba(0, 255, 204, 0.1)';
             ctx.lineWidth = 1;
@@ -831,15 +1040,19 @@
                 ctx.stroke();
             }
             
-            // Animated circuit nodes
-            const time = Date.now() * 0.001;
-            ctx.fillStyle = 'rgba(0, 255, 204, 0.2)';
-            for (let x = gridSize; x < canvas.width; x += gridSize) {
-                for (let y = gridSize; y < canvas.height; y += gridSize) {
-                    const pulse = Math.sin(time + x * 0.01 + y * 0.01) * 0.5 + 0.5;
-                    ctx.beginPath();
-                    ctx.arc(x, y, 2 + pulse * 2, 0, Math.PI * 2);
-                    ctx.fill();
+            // Skip animated nodes on very low-end devices
+            if (!isLowEnd) {
+                // Animated circuit nodes (less dense on mobile for performance)
+                const time = Date.now() * 0.001;
+                const nodeSpacing = isMobile ? gridSize * 2 : gridSize;
+                ctx.fillStyle = 'rgba(0, 255, 204, 0.2)';
+                for (let x = nodeSpacing; x < canvas.width; x += nodeSpacing) {
+                    for (let y = nodeSpacing; y < canvas.height; y += nodeSpacing) {
+                        const pulse = Math.sin(time + x * 0.01 + y * 0.01) * 0.5 + 0.5;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 2 + pulse * 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
             
@@ -848,6 +1061,33 @@
             drawMemoryCell(canvas.width - 50, 50, 30);
             drawMemoryCell(50, canvas.height - 50, 30);
             drawMemoryCell(canvas.width - 50, canvas.height - 50, 30);
+            
+            // Skip center decoration on low-end
+            if (!isLowEnd) {
+                // Center decoration
+                ctx.save();
+                ctx.globalAlpha = 0.1;
+                ctx.strokeStyle = '#00ffcc';
+                ctx.lineWidth = 2;
+                const centerRadius = Math.min(canvas.width, canvas.height) * 0.3;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, centerRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Rotating center element
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.rotate(time * 0.2);
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(Math.cos(angle) * centerRadius * 0.8, Math.sin(angle) * centerRadius * 0.8);
+                    ctx.stroke();
+                }
+                ctx.restore();
+                ctx.restore();
+            }
         }
         
         function drawMemoryCell(x, y, size) {
@@ -890,9 +1130,26 @@
             // For mobile, angle is updated in joystick handler
             
             // Update power-up timers
-            if (player.rapidFire > 0) player.rapidFire--;
-            if (player.tripleShot > 0) player.tripleShot--;
-            if (player.shield > 0) player.shield--;
+            if (player.rapidFire > 0) {
+                player.rapidFire--;
+                document.getElementById('rapidFireIndicator').style.display = 'block';
+            } else {
+                document.getElementById('rapidFireIndicator').style.display = 'none';
+            }
+            
+            if (player.tripleShot > 0) {
+                player.tripleShot--;
+                document.getElementById('tripleShotIndicator').style.display = 'block';
+            } else {
+                document.getElementById('tripleShotIndicator').style.display = 'none';
+            }
+            
+            if (player.shield > 0) {
+                player.shield--;
+                document.getElementById('shieldIndicator').style.display = 'block';
+            } else {
+                document.getElementById('shieldIndicator').style.display = 'none';
+            }
         }
         
         // Draw player
@@ -920,9 +1177,11 @@
                 }
             }
             
-            // Draw glow effect
-            ctx.shadowBlur = 20 + player.glowIntensity * 10;
-            ctx.shadowColor = player.color;
+            // Draw glow effect (reduced on low-end devices)
+            if (!isLowEnd) {
+                ctx.shadowBlur = 20 + player.glowIntensity * 10;
+                ctx.shadowColor = player.color;
+            }
             
             // Draw player circle
             ctx.fillStyle = player.color;
@@ -1056,10 +1315,12 @@
                     for (let i = -1; i <= 1; i++) {
                         const angle = player.angle + (i * 0.2);
                         bullets.push(new Bullet(player.x, player.y, angle));
+                        totalShotsFired++;
                     }
                 } else {
                     // Single shot
                     bullets.push(new Bullet(player.x, player.y, player.angle));
+                    totalShotsFired++;
                 }
                 
                 lastShootTime = currentTime;
@@ -1072,6 +1333,18 @@
         function createMuzzleFlash() {
             const flashX = player.x + Math.cos(player.angle) * player.radius;
             const flashY = player.y + Math.sin(player.angle) * player.radius;
+            
+            // Visual sound wave effect
+            particles.push({
+                x: flashX,
+                y: flashY,
+                dx: 0,
+                dy: 0,
+                radius: 5,
+                life: 10,
+                color: '#ffffff',
+                type: 'soundwave'
+            });
             
             for (let i = 0; i < 5; i++) {
                 particles.push({
@@ -1101,6 +1374,31 @@
                 particle.life--;
                 particle.dx *= 0.98;
                 particle.dy *= 0.98;
+                
+                // Check poison cloud collision with player
+                if (particle.type === 'poison' && gameState === 'playing') {
+                    const dx = player.x - particle.x;
+                    const dy = player.y - particle.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < player.radius + particle.radius) {
+                        if (player.shield > 0) {
+                            player.shield = Math.max(0, player.shield - 30);
+                        } else {
+                            // Poison damage
+                            lives--;
+                            updateUI();
+                            createExplosion(player.x, player.y, '#ff0000', false);
+                            shakeScreen();
+                            
+                            if (lives <= 0) {
+                                gameOver();
+                            }
+                        }
+                        return false; // Remove poison cloud
+                    }
+                }
+                
                 return particle.life > 0;
             });
         }
@@ -1108,13 +1406,49 @@
         function drawParticles() {
             particles.forEach(particle => {
                 ctx.save();
-                ctx.globalAlpha = particle.life / 10;
-                ctx.fillStyle = particle.color;
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = particle.color;
-                ctx.beginPath();
-                ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-                ctx.fill();
+                
+                if (particle.type === 'poison') {
+                    // Draw poison cloud
+                    ctx.globalAlpha = (particle.life / 60) * 0.6;
+                    const gradient = ctx.createRadialGradient(
+                        particle.x, particle.y, 0,
+                        particle.x, particle.y, particle.radius
+                    );
+                    gradient.addColorStop(0, '#ff0066');
+                    gradient.addColorStop(1, 'rgba(255, 0, 102, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.radius + Math.sin(Date.now() * 0.01) * 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Warning symbol
+                    ctx.globalAlpha = (particle.life / 60);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('☠', particle.x, particle.y);
+                } else if (particle.type === 'soundwave') {
+                    // Sound wave effect
+                    const maxRadius = 30;
+                    const currentRadius = maxRadius * (1 - particle.life / 10);
+                    ctx.globalAlpha = particle.life / 10 * 0.5;
+                    ctx.strokeStyle = particle.color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, currentRadius, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else {
+                    // Normal particles
+                    ctx.globalAlpha = particle.life / 30;
+                    ctx.fillStyle = particle.color;
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = particle.color;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
                 ctx.restore();
             });
         }
@@ -1131,6 +1465,11 @@
         window.addEventListener('keydown', (e) => {
             keys[e.key.toLowerCase()] = true;
             updatePlayerMovement();
+            
+            // Pause with P key
+            if (e.key.toLowerCase() === 'p' && (gameState === 'playing' || gameState === 'paused')) {
+                togglePause();
+            }
         });
         
         window.addEventListener('keyup', (e) => {
@@ -1278,6 +1617,68 @@
         canvas.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
+        
+        // Initialize UI on load
+        updateUI();
+        loadAchievements();
+        
+        // Achievement screen functions
+        function showAchievements() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('achievementsScreen').style.display = 'flex';
+            populateAchievements();
+        }
+        
+        function hideAchievements() {
+            document.getElementById('achievementsScreen').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'flex';
+        }
+        
+        function populateAchievements() {
+            const list = document.getElementById('achievementsList');
+            list.innerHTML = '';
+            
+            let unlockedCount = 0;
+            const totalCount = Object.keys(achievements).length;
+            
+            for (let key in achievements) {
+                const achievement = achievements[key];
+                if (achievement.unlocked) unlockedCount++;
+                
+                const item = document.createElement('div');
+                item.style.cssText = `
+                    padding: 15px;
+                    margin: 10px 0;
+                    background: ${achievement.unlocked ? 'rgba(255, 204, 0, 0.1)' : 'rgba(100, 100, 100, 0.1)'};
+                    border: 2px solid ${achievement.unlocked ? '#ffcc00' : '#666666'};
+                    border-radius: 5px;
+                    display: flex;
+                    align-items: center;
+                `;
+                
+                item.innerHTML = `
+                    <div style="font-size: 30px; margin-right: 15px;">
+                        ${achievement.unlocked ? '🏆' : '🔒'}
+                    </div>
+                    <div>
+                        <div style="font-weight: bold; color: ${achievement.unlocked ? '#ffcc00' : '#666666'};">
+                            ${achievement.name}
+                        </div>
+                        <div style="font-size: 0.9em; color: ${achievement.unlocked ? '#aaaaaa' : '#555555'};">
+                            ${achievement.desc}
+                        </div>
+                    </div>
+                `;
+                
+                list.appendChild(item);
+            }
+            
+            // Progress indicator
+            const progress = document.createElement('div');
+            progress.style.cssText = 'text-align: center; margin-top: 20px; color: #00ffcc;';
+            progress.innerHTML = `Progress: ${unlockedCount}/${totalCount} (${Math.floor(unlockedCount / totalCount * 100)}%)`;
+            list.appendChild(progress);
+        }
     </script>
 </body>
 </html>
