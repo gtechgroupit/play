@@ -1782,22 +1782,31 @@
                     { // Pattern 6: Buco
                         rings: [{x: 50, y: -150}],
                         obstacles: [{x: 50, y: 50, type: 'hole'}]
+                    },
+                    { // Pattern 7: Combo spike e barrier
+                        rings: [{x: 25, y: -100}, {x: 75, y: -150}],
+                        obstacles: [{x: 0, y: 0, type: 'spike'}, {x: 100, y: -30, type: 'barrier'}]
+                    },
+                    { // Pattern 8: Triplo ostacolo
+                        rings: [{x: 0, y: -100}, {x: 150, y: -100}],
+                        obstacles: [{x: 0, y: 0, type: 'spike'}, {x: 50, y: -20, type: 'firewall'}, {x: 100, y: 0, type: 'spike'}]
                     }
                 ];
                 
                 this.lastPatternX = screenWidth;
-                this.minDistance = 300;
-                this.maxDistance = 500;
+                this.minDistance = 150;  // Ridotto ulteriormente
+                this.maxDistance = 250;  // Ridotto ulteriormente
+                this.nextSpawnX = screenWidth + 50;  // Più vicino
             }
 
             shouldGenerate() {
-                return this.lastPatternX < screenWidth + 200;
+                return this.nextSpawnX < screenWidth + 500;
             }
 
             generate(rings, obstacles) {
                 // Modalità Zen: solo anelli, nessun ostacolo
                 if (gameState.gameMode === 'zen') {
-                    const baseX = this.lastPatternX + 100 + Math.random() * 200;
+                    const baseX = this.nextSpawnX;
                     const groundY = screenHeight - 100;
                     
                     // Genera pattern di anelli più interessanti
@@ -1832,13 +1841,13 @@
                     const pattern = patterns[Math.floor(Math.random() * patterns.length)];
                     pattern();
                     
-                    this.lastPatternX = baseX + 200;
+                    this.nextSpawnX = baseX + 300;
                     return;
                 }
                 
-                // Modalità Classic e Time Attack
+                // Modalità Classic e Time Attack - Assicurati che vengano generati ostacoli
                 const pattern = this.patterns[Math.floor(Math.random() * this.patterns.length)];
-                const baseX = this.lastPatternX + this.minDistance + Math.random() * (this.maxDistance - this.minDistance);
+                const baseX = this.nextSpawnX;
                 const groundY = screenHeight - 100;
 
                 // Genera anelli
@@ -1846,16 +1855,25 @@
                     rings.push(new Ring(baseX + ring.x, groundY + ring.y));
                 });
 
-                // Genera ostacoli
+                // Genera ostacoli - SEMPRE almeno uno
+                if (pattern.obstacles.length === 0 || Math.random() < 0.3) {
+                    // Aggiungi un ostacolo extra se il pattern non ne ha o casualmente
+                    const extraTypes = ['spike', 'barrier', 'firewall', 'hole'];
+                    const extraType = extraTypes[Math.floor(Math.random() * extraTypes.length)];
+                    obstacles.push(new Obstacle(baseX + 150, groundY, extraType));
+                }
+                
                 pattern.obstacles.forEach(obstacle => {
                     obstacles.push(new Obstacle(baseX + obstacle.x, groundY + obstacle.y, obstacle.type));
                 });
 
-                this.lastPatternX = baseX + 200;
+                // Calcola prossima posizione spawn basata sulla velocità
+                const distance = this.minDistance + Math.random() * (this.maxDistance - this.minDistance);
+                this.nextSpawnX = baseX + distance;
 
-                // Aumenta difficoltà nel tempo
-                this.minDistance = Math.max(200, this.minDistance - 0.5);
-                this.maxDistance = Math.max(300, this.maxDistance - 0.5);
+                // Aumenta difficoltà nel tempo in modo più aggressivo
+                this.minDistance = Math.max(100, this.minDistance - 1);
+                this.maxDistance = Math.max(180, this.maxDistance - 1.5);
             }
         }
 
@@ -1879,6 +1897,10 @@
             init() {
                 this.setupCanvas();
                 this.setupEventListeners();
+                
+                // Inizializza modalità classic di default
+                gameState.gameMode = 'classic';
+                
                 this.reset();
                 
                 // Nascondi schermata di caricamento
@@ -1917,12 +1939,9 @@
                 window.addEventListener('keydown', (e) => {
                     // Menu modalità
                     if (!gameState.running && !gameState.gameOver) {
-                        if (e.key === '1') {
-                            gameState.gameMode = 'classic';
-                        } else if (e.key === '2') {
-                            gameState.gameMode = 'timeAttack';
-                        } else if (e.key === '3') {
-                            gameState.gameMode = 'zen';
+                        if (e.key === '1' || e.key === '2' || e.key === '3') {
+                            this.handleModeSelection(e.key);
+                            return;
                         }
                     }
                     
@@ -2000,8 +2019,26 @@
                     this.player.jump();
                 }
             }
+            
+            handleModeSelection(key) {
+                if (!gameState.running && !gameState.gameOver) {
+                    if (key === '1') {
+                        gameState.gameMode = 'classic';
+                        this.render(); // Aggiorna schermata
+                    } else if (key === '2') {
+                        gameState.gameMode = 'timeAttack';
+                        this.render();
+                    } else if (key === '3') {
+                        gameState.gameMode = 'zen';
+                        this.render();
+                    }
+                }
+            }
 
             reset() {
+                // Mantieni la modalità selezionata
+                const currentMode = gameState.gameMode || 'classic';
+                
                 gameState = {
                     running: false,
                     paused: false,
@@ -2033,8 +2070,8 @@
                     // Reset boss
                     bossActive: false,
                     bossDefeated: 0,
-                    // Mantieni modalità
-                    gameMode: gameState.gameMode || 'classic',
+                    // Mantieni modalità selezionata
+                    gameMode: currentMode,
                     timeAttackTimer: 60000,
                     zenScore: 0
                 };
@@ -2060,6 +2097,32 @@
             start() {
                 gameState.running = true;
                 this.lastTime = performance.now();
+                
+                // Genera alcuni ostacoli iniziali per iniziare subito l'azione
+                if (gameState.gameMode !== 'zen') {
+                    // Primo ostacolo dopo un po' di spazio
+                    this.obstacles.push(new Obstacle(screenWidth + 300, screenHeight - 100, 'spike'));
+                    this.rings.push(new Ring(screenWidth + 300, screenHeight - 200));
+                    
+                    // Secondo set
+                    this.obstacles.push(new Obstacle(screenWidth + 500, screenHeight - 130, 'barrier'));
+                    this.rings.push(new Ring(screenWidth + 450, screenHeight - 250));
+                    this.rings.push(new Ring(screenWidth + 500, screenHeight - 250));
+                    this.rings.push(new Ring(screenWidth + 550, screenHeight - 250));
+                    
+                    // Power-up iniziale per aiutare
+                    this.powerUps.push(new PowerUp(screenWidth + 700, screenHeight - 200, 'shield'));
+                    
+                    // Imposta spawn per continuare
+                    this.levelGenerator.nextSpawnX = screenWidth + 800;
+                } else {
+                    // Zen mode: solo anelli
+                    for (let i = 0; i < 5; i++) {
+                        this.rings.push(new Ring(screenWidth + 200 + i * 50, screenHeight - 150));
+                    }
+                    this.levelGenerator.nextSpawnX = screenWidth + 500;
+                }
+                
                 this.gameLoop();
             }
 
@@ -2106,24 +2169,25 @@
                 // Update sfondo
                 this.background.update();
 
-                // Genera nuovi elementi
-                if (this.levelGenerator.shouldGenerate()) {
+                // Genera nuovi elementi continuamente - con check più frequente
+                if (this.levelGenerator.shouldGenerate() || 
+                    (this.obstacles.length < 3 && this.rings.length < 5)) {  // Garantisci sempre elementi
                     this.levelGenerator.generate(this.rings, this.obstacles);
                     
                     // Genera power-up occasionalmente
-                    if (Math.random() < 0.05) {
+                    if (Math.random() < 0.05 && gameState.gameMode !== 'zen') {
                         const powerTypes = ['shield', 'magnet', 'slowMotion', 'multiRing', 'extraLife'];
                         const type = powerTypes[Math.floor(Math.random() * powerTypes.length)];
                         this.powerUps.push(new PowerUp(
-                            screenWidth + 100,
+                            this.levelGenerator.nextSpawnX - 100,
                             screenHeight - 200 - Math.random() * 200,
                             type
                         ));
                     }
                 }
                 
-                // Spawn boss ogni 1000 punti
-                if (!gameState.bossActive && gameState.score > (gameState.bossDefeated + 1) * 1000) {
+                // Spawn boss ogni 1000 punti (solo in classic mode)
+                if (!gameState.bossActive && gameState.score > (gameState.bossDefeated + 1) * 1000 && gameState.gameMode === 'classic') {
                     gameState.bossActive = true;
                     this.boss = new Boss(screenWidth + 200, screenHeight / 2);
                 }
@@ -2141,7 +2205,13 @@
 
                 // Update ostacoli
                 this.obstacles = this.obstacles.filter(obstacle => {
-                    if (!obstacle.update()) return false;
+                    if (!obstacle.update()) {
+                        // Quando un ostacolo esce dallo schermo, aggiorna il contatore per generarne di nuovi
+                        if (obstacle.x < -100) {
+                            this.levelGenerator.nextSpawnX = Math.min(this.levelGenerator.nextSpawnX, screenWidth + 200);
+                        }
+                        return false;
+                    }
                     
                     if (obstacle.checkCollision(this.player)) {
                         this.handleCollision();
@@ -2796,17 +2866,33 @@
                 
                 modes.forEach((mode, index) => {
                     const y = screenHeight * 0.55 + index * 60;
+                    const isSelected = gameState.gameMode === mode.mode;
+                    
+                    // Box per modalità selezionata
+                    if (isSelected) {
+                        ctx.save();
+                        ctx.strokeStyle = COLORS.primary;
+                        ctx.lineWidth = 2;
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = COLORS.primary;
+                        ctx.strokeRect(screenWidth / 2 - 150, y - 25, 300, 50);
+                        ctx.restore();
+                    }
+                    
                     ctx.font = `${18 * scale}px Arial`;
-                    ctx.fillStyle = gameState.gameMode === mode.mode ? COLORS.primary : COLORS.white;
+                    ctx.fillStyle = isSelected ? COLORS.primary : COLORS.white;
                     ctx.fillText(`[${mode.key}] ${mode.name}`, screenWidth / 2, y);
                     ctx.font = `${14 * scale}px Arial`;
-                    ctx.fillStyle = '#888';
+                    ctx.fillStyle = isSelected ? COLORS.primary : '#888';
                     ctx.fillText(mode.desc, screenWidth / 2, y + 20);
                 });
 
                 // Istruzioni
                 ctx.font = `${16 * scale}px Arial`;
                 ctx.fillStyle = COLORS.white;
+                
+                // Mostra istruzioni per cambiare modalità
+                ctx.fillText('Premi 1, 2 o 3 per cambiare modalità', screenWidth / 2, screenHeight * 0.48);
                 
                 if (window.matchMedia("(hover: none)").matches) {
                     ctx.fillText('Tocca per iniziare', screenWidth / 2, screenHeight * 0.8);
