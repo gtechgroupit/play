@@ -215,7 +215,47 @@
             animation: checkpointPulse 2s ease-out;
         }
 
-        /* Media queries per responsive */
+        /* Achievement notification */
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        
+        /* Mode buttons */
+        .mode-btn {
+            width: 150px;
+            margin: 5px;
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn:hover {
+            opacity: 1 !important;
+        }
+        
+        /* Health bar effect */
+        .health-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ff66cc;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff66cc, #ff00ff);
+            transition: width 0.3s;
+        }
         @media (max-width: 768px) {
             #gameStats {
                 font-size: 16px;
@@ -318,6 +358,18 @@
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
         
+        // Sistema achievement
+        const achievements = {
+            firstBlood: { name: 'First Blood', desc: 'Dodge 10 obstacles', unlocked: false },
+            comboMaster: { name: 'Combo Master', desc: 'Reach 10x combo', unlocked: false },
+            speedDemon: { name: 'Speed Demon', desc: 'Survive at max speed', unlocked: false },
+            bossSlayer: { name: 'Boss Slayer', desc: 'Defeat a boss', unlocked: false },
+            survivor: { name: 'Survivor', desc: 'Reach 10000 points', unlocked: false }
+        };
+        
+        // Game modes
+        let gameMode = 'classic'; // classic, endless, challenge, zen
+        
         // Variabili di gioco
         let gameRunning = false;
         let score = 0;
@@ -363,9 +415,20 @@
             slowMotionTime: 0
         };
         
-        // Ostacoli
+        // Ostacoli e nemici
         let obstacles = [];
-        const obstacleTypes = ['firewall', 'laser', 'glitch', 'cube'];
+        const obstacleTypes = ['firewall', 'laser', 'glitch', 'cube', 'virus', 'trojan', 'worm'];
+        
+        // Nuovi tipi di nemici
+        const enemyConfigs = {
+            firewall: { color: '#ff0066', pattern: 'static' },
+            laser: { color: '#00ff00', pattern: 'horizontal' },
+            glitch: { color: '#ff00ff', pattern: 'random' },
+            cube: { color: '#00ffff', pattern: 'static' },
+            virus: { color: '#ffff00', pattern: 'zigzag' },
+            trojan: { color: '#ff8800', pattern: 'homing' },
+            worm: { color: '#8800ff', pattern: 'sine' }
+        };
         
         // Power-ups
         let powerUps = [];
@@ -393,7 +456,108 @@
         let touchStartX = null;
         let moveDirection = 0;
         
-        // ===== SISTEMA AUDIO =====
+        // ===== SELEZIONE MODALITÀ =====
+        
+        function selectMode(mode) {
+            gameMode = mode;
+            
+            // Evidenzia bottone selezionato
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.style.opacity = '0.5';
+            });
+            event.target.style.opacity = '1';
+            
+            // Configura modalità
+            switch(mode) {
+                case 'classic':
+                    maxSpeed = 20;
+                    acceleration = 0.0005;
+                    lives = 3;
+                    break;
+                    
+                case 'endless':
+                    maxSpeed = 25;
+                    acceleration = 0.0008;
+                    lives = 1;
+                    break;
+                    
+                case 'challenge':
+                    maxSpeed = 30;
+                    acceleration = 0.001;
+                    lives = 1;
+                    speed = 10; // Inizia più veloce
+                    break;
+                    
+                case 'zen':
+                    maxSpeed = 15;
+                    acceleration = 0.0003;
+                    lives = 5;
+                    break;
+            }
+        }
+        
+        // ===== SISTEMA ACHIEVEMENT =====
+        
+        function checkAchievements() {
+            // First Blood
+            if (!achievements.firstBlood.unlocked && nearMisses >= 10) {
+                unlockAchievement('firstBlood');
+            }
+            
+            // Combo Master
+            if (!achievements.comboMaster.unlocked && combo >= 10) {
+                unlockAchievement('comboMaster');
+            }
+            
+            // Speed Demon
+            if (!achievements.speedDemon.unlocked && speed >= maxSpeed) {
+                unlockAchievement('speedDemon');
+            }
+            
+            // Boss Slayer
+            if (!achievements.bossSlayer.unlocked && boss && boss.defeated) {
+                unlockAchievement('bossSlayer');
+            }
+            
+            // Survivor
+            if (!achievements.survivor.unlocked && score >= 10000) {
+                unlockAchievement('survivor');
+            }
+        }
+        
+        function unlockAchievement(id) {
+            achievements[id].unlocked = true;
+            showAchievementNotification(achievements[id].name);
+            score += 1000;
+        }
+        
+        function showAchievementNotification(name) {
+            const notification = document.createElement('div');
+            notification.className = 'achievement-notification';
+            notification.innerHTML = `
+                <div style="color: #ffff00; font-size: 1.2em; margin-bottom: 5px;">🏆 ACHIEVEMENT UNLOCKED!</div>
+                <div>${name}</div>
+            `;
+            notification.style.cssText = `
+                position: absolute;
+                top: 100px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.9);
+                border: 2px solid #ffff00;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 0 30px #ffff00;
+                z-index: 100;
+                animation: slideIn 0.5s ease-out;
+            `;
+            
+            document.getElementById('gameUI').appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.5s ease-out';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
         
         function initAudio() {
             if (!audioContext) {
@@ -676,7 +840,9 @@
         function gameLoop(currentTime) {
             if (!gameRunning) return;
             
-            const deltaTime = currentTime - lastTime;
+            // Calcola deltaTime in modo sicuro
+            if (!lastTime) lastTime = currentTime;
+            const deltaTime = Math.min(currentTime - lastTime, 100); // Cap a 100ms per evitare salti
             lastTime = currentTime;
             
             // Update
@@ -829,27 +995,69 @@
         }
         
         function updateObstacles(timeScale = 1) {
-            // Genera nuovi ostacoli
-            if (Math.random() < 0.02 + (speed / 1000)) {
+            // Genera nuovi ostacoli con frequenza basata sulla modalità
+            let spawnChance = 0.02 + (speed / 1000);
+            if (gameMode === 'challenge') spawnChance *= 1.5;
+            if (gameMode === 'zen') spawnChance *= 0.5;
+            
+            if (Math.random() < spawnChance) {
                 const lane = Math.floor(Math.random() * 3);
                 const type = obstacleTypes[Math.floor(Math.random() * obstacleTypes.length)];
                 
                 obstacles.push({
                     lane: lane,
+                    originalLane: lane,
                     z: tunnel.depth,
                     type: type,
                     hit: false,
-                    nearMissChecked: false
+                    nearMissChecked: false,
+                    movement: enemyConfigs[type]?.pattern || 'static',
+                    moveTimer: 0
                 });
             }
             
             // Update ostacoli esistenti
             obstacles = obstacles.filter(obstacle => {
                 obstacle.z -= speed * timeScale;
+                obstacle.moveTimer += timeScale;
+                
+                // Pattern di movimento
+                switch(obstacle.movement) {
+                    case 'sine':
+                        obstacle.lane = obstacle.originalLane + Math.sin(obstacle.moveTimer * 0.05) * 0.8;
+                        break;
+                        
+                    case 'zigzag':
+                        if (Math.floor(obstacle.moveTimer / 30) % 2 === 0) {
+                            obstacle.lane = Math.min(2, obstacle.originalLane + 0.5);
+                        } else {
+                            obstacle.lane = Math.max(0, obstacle.originalLane - 0.5);
+                        }
+                        break;
+                        
+                    case 'homing':
+                        if (obstacle.z > 300) {
+                            const targetLane = player.lane;
+                            obstacle.lane += (targetLane - obstacle.lane) * 0.02;
+                        }
+                        break;
+                        
+                    case 'random':
+                        if (obstacle.moveTimer % 60 === 0) {
+                            obstacle.lane = Math.floor(Math.random() * 3);
+                        }
+                        break;
+                }
+                
+                // Limita lane
+                obstacle.lane = Math.max(0, Math.min(2, obstacle.lane));
                 
                 // Check near miss per combo
                 if (!obstacle.nearMissChecked && obstacle.z < 0 && obstacle.z > -150) {
-                    if (obstacle.lane !== player.lane) {
+                    const playerLane = Math.round(player.lane);
+                    const obstacleLane = Math.round(obstacle.lane);
+                    
+                    if (obstacleLane !== playerLane) {
                         // Near miss!
                         obstacle.nearMissChecked = true;
                         nearMisses++;
@@ -858,7 +1066,7 @@
                         score += 50 * combo;
                         
                         // Effetto visivo near miss
-                        createNearMissEffect(obstacle.lane);
+                        createNearMissEffect(obstacleLane);
                         playSound('combo');
                         
                         // Mostra messaggio combo
@@ -870,7 +1078,10 @@
                 
                 // Check collisione
                 if (!obstacle.hit && obstacle.z < 100 && obstacle.z > -100) {
-                    if (obstacle.lane === player.lane) {
+                    const playerLane = Math.round(player.lane);
+                    const obstacleLane = Math.round(obstacle.lane);
+                    
+                    if (obstacleLane === playerLane) {
                         // Collisione!
                         obstacle.hit = true;
                         
@@ -903,11 +1114,14 @@
                 
                 return obstacle.z > -200;
             });
+            
+            // Check achievements
+            checkAchievements();
         }
         
         function updatePowerUps(timeScale = 1) {
             // Genera nuovi power-up
-            if (Math.random() < 0.005) { // Meno frequenti degli ostacoli
+            if (Math.random() < 0.008) { // Aumentata frequenza
                 const lane = Math.floor(Math.random() * 3);
                 const types = Object.keys(powerUpTypes);
                 const type = types[Math.floor(Math.random() * types.length)];
