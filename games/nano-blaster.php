@@ -1,31 +1,4 @@
-function resetGame() {
-            score = 0;
-            lives = 3;
-            wave = 1;
-            enemies = [];
-            bullets = [];
-            particles = [];
-            powerUps = [];
-            floatingTexts = [];
-            achievementQueue = [];
-            waveEnemyCount = 5;
-            enemiesKilledInWave = 0;
-            bossSpawned = false;
-            combo = 0;
-            comboTimer = 0;
-            maxCombo = 0;
-            totalKills = 0;
-            powerUpsCollected = 0;
-            totalShotsFired = 0;
-            totalShotsHit = 0;
-            waveStartLives = 3;
-            player.x = canvas.width / 2;
-            player.y = canvas.height / 2;
-            player.dx = 0;
-            player.dy = 0;
-            player.rapidFire = 0;
-            player.tripleShot = 0;
-      <?php
+<?php
 /**
  * Nano Blaster - G Tech Arcade
  * Shooter survival game in microelectronic environment
@@ -37,7 +10,9 @@ function resetGame() {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nano Blaster - G Tech Arcade</title>
+    <meta name="description" content="Nano Blaster - Defend the chip from nano-virus invasion! A thrilling HTML5 arcade shooter game.">
+    <meta name="author" content="G Tech Group">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='12' font-size='12'>🎮</text></svg>">
     <style>
         * {
             margin: 0;
@@ -208,10 +183,16 @@ function resetGame() {
             cursor: pointer;
             text-align: center;
             line-height: 36px;
+            transition: all 0.3s;
+        }
+        
+        #pauseButton:hover {
+            background: rgba(0, 255, 204, 0.4);
+            transform: scale(1.1);
         }
         
         #pauseButton:active {
-            background: rgba(0, 255, 204, 0.4);
+            transform: scale(0.95);
         }
         
         @media (max-width: 768px) {
@@ -296,6 +277,9 @@ function resetGame() {
             <p style="text-align: center; margin-top: 20px; color: #ff3344;">
                 <strong>⚠️ BOSS every 5 waves!</strong>
             </p>
+        </div>
+        <div style="position: absolute; bottom: 20px; color: #666; font-size: 0.8em;">
+            © 2024 G Tech Group - All rights reserved
         </div>
     </div>
     
@@ -1013,6 +997,20 @@ function resetGame() {
         
         // Draw microelectronic background with animated elements
         function drawBackground() {
+            // Ambient particles
+            if (Math.random() < 0.1 && particles.length < 100) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    dx: (Math.random() - 0.5) * 0.5,
+                    dy: (Math.random() - 0.5) * 0.5,
+                    radius: Math.random() * 2 + 1,
+                    life: 100 + Math.random() * 100,
+                    color: 'rgba(0, 255, 204, 0.3)',
+                    type: 'ambient'
+                });
+            }
+            
             // Skip some effects on low-end devices
             if (!isLowEnd) {
                 // Animated scan line effect
@@ -1372,8 +1370,17 @@ function resetGame() {
                 particle.x += particle.dx;
                 particle.y += particle.dy;
                 particle.life--;
-                particle.dx *= 0.98;
-                particle.dy *= 0.98;
+                
+                if (particle.type === 'ambient') {
+                    // Wrap ambient particles around screen
+                    if (particle.x < 0) particle.x = canvas.width;
+                    if (particle.x > canvas.width) particle.x = 0;
+                    if (particle.y < 0) particle.y = canvas.height;
+                    if (particle.y > canvas.height) particle.y = 0;
+                } else {
+                    particle.dx *= 0.98;
+                    particle.dy *= 0.98;
+                }
                 
                 // Check poison cloud collision with player
                 if (particle.type === 'poison' && gameState === 'playing') {
@@ -1407,7 +1414,14 @@ function resetGame() {
             particles.forEach(particle => {
                 ctx.save();
                 
-                if (particle.type === 'poison') {
+                if (particle.type === 'ambient') {
+                    // Ambient background particles
+                    ctx.globalAlpha = (particle.life / 200) * 0.3;
+                    ctx.fillStyle = particle.color;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (particle.type === 'poison') {
                     // Draw poison cloud
                     ctx.globalAlpha = (particle.life / 60) * 0.6;
                     const gradient = ctx.createRadialGradient(
@@ -1621,6 +1635,24 @@ function resetGame() {
         // Initialize UI on load
         updateUI();
         loadAchievements();
+        
+        // Set welcome message based on time of day
+        const hour = new Date().getHours();
+        let welcomeMessage = '';
+        if (hour >= 5 && hour < 12) {
+            welcomeMessage = 'Good morning, Commander!';
+        } else if (hour >= 12 && hour < 18) {
+            welcomeMessage = 'Good afternoon, Commander!';
+        } else {
+            welcomeMessage = 'Good evening, Commander!';
+        }
+        
+        // Add welcome message to start screen
+        const startScreen = document.getElementById('startScreen');
+        const welcomeEl = document.createElement('p');
+        welcomeEl.style.cssText = 'color: #00ffcc; font-size: 0.9em; margin-top: -10px; margin-bottom: 20px;';
+        welcomeEl.textContent = welcomeMessage;
+        startScreen.insertBefore(welcomeEl, startScreen.children[2]);
         
         // Achievement screen functions
         function showAchievements() {
