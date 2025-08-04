@@ -196,6 +196,8 @@
         let screenHeight = window.innerHeight;
         let scale = 1;
         let game = null; // Riferimento globale al gioco
+        let camera = { shake: 0, zoom: 1 }; // Sistema camera
+        const isMobile = 'ontouchstart' in window;
 
         // ===== CLASSE PLAYER (RICCIO) =====
         class Hedgehog {
@@ -354,105 +356,236 @@
             }
 
             draw() {
-                // Disegna trail
-                this.trail.forEach(point => {
+                // Disegna trail con effetto rainbow in boost
+                this.trail.forEach((point, index) => {
                     ctx.save();
                     ctx.globalAlpha = point.opacity * 0.5;
-                    ctx.fillStyle = point.color || COLORS.secondary;
+                    
+                    if (gameState.boosting) {
+                        // Trail arcobaleno durante boost
+                        const hue = (Date.now() * 0.5 + index * 30) % 360;
+                        ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                    } else {
+                        ctx.fillStyle = point.color || COLORS.secondary;
+                    }
+                    
                     ctx.shadowBlur = 20;
-                    ctx.shadowColor = point.color || COLORS.secondary;
+                    ctx.shadowColor = ctx.fillStyle;
+                    
+                    // Trail con forma dinamica
+                    const size = this.width / 2 * 0.8 * (1 - index / this.trail.length);
                     ctx.beginPath();
-                    ctx.arc(point.x, point.y, this.width / 2 * 0.8, 0, Math.PI * 2);
+                    ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 });
 
                 ctx.save();
                 ctx.translate(this.x, this.y);
+                
+                // Animazione respirazione
+                const breathe = 1 + Math.sin(this.animationFrame * 0.02) * 0.05;
+                ctx.scale(breathe, breathe);
+                
                 ctx.rotate(this.rotation);
 
-                // Shield visivo
+                // Shield visivo avanzato
                 if (gameState.shieldActive) {
                     ctx.save();
-                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.01) * 0.2;
-                    ctx.strokeStyle = COLORS.primary;
-                    ctx.lineWidth = 3;
-                    ctx.shadowBlur = 30;
-                    ctx.shadowColor = COLORS.primary;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, this.width / 2 + 10, 0, Math.PI * 2);
-                    ctx.stroke();
                     
-                    // Indicatore hits rimanenti
+                    // Shield esterno animato
+                    for (let i = 0; i < 3; i++) {
+                        const alpha = 0.3 - i * 0.1;
+                        const radius = this.width / 2 + 10 + i * 5;
+                        const rotation = Date.now() * 0.001 * (i % 2 === 0 ? 1 : -1);
+                        
+                        ctx.globalAlpha = alpha + Math.sin(Date.now() * 0.01 + i) * 0.1;
+                        ctx.strokeStyle = COLORS.primary;
+                        ctx.lineWidth = 2;
+                        ctx.shadowBlur = 30;
+                        ctx.shadowColor = COLORS.primary;
+                        
+                        ctx.beginPath();
+                        for (let j = 0; j < 6; j++) {
+                            const angle = (Math.PI / 3) * j + rotation;
+                            const x = Math.cos(angle) * radius;
+                            const y = Math.sin(angle) * radius;
+                            if (j === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        ctx.stroke();
+                    }
+                    
+                    // Indicatore hits con animazione
                     for (let i = 0; i < gameState.shieldHits; i++) {
-                        const angle = (Math.PI * 2 / 3) * i;
+                        const angle = (Math.PI * 2 / 3) * i - Date.now() * 0.002;
+                        const pulse = 1 + Math.sin(Date.now() * 0.01 + i) * 0.2;
                         ctx.fillStyle = COLORS.primary;
+                        ctx.shadowBlur = 20;
                         ctx.beginPath();
                         ctx.arc(
-                            Math.cos(angle) * (this.width / 2 + 15),
-                            Math.sin(angle) * (this.width / 2 + 15),
-                            3, 0, Math.PI * 2
+                            Math.cos(angle) * (this.width / 2 + 20) * pulse,
+                            Math.sin(angle) * (this.width / 2 + 20) * pulse,
+                            5, 0, Math.PI * 2
                         );
                         ctx.fill();
                     }
                     ctx.restore();
                 }
 
-                // Effetto invincibilità
-                if (gameState.invincible && Math.floor(gameState.invincibilityTimer / GAME_CONFIG.invincibilityFlash) % 2) {
-                    ctx.globalAlpha = 0.5;
+                // Effetto invincibilità con distorsione
+                if (gameState.invincible) {
+                    const flicker = Math.floor(gameState.invincibilityTimer / GAME_CONFIG.invincibilityFlash) % 2;
+                    if (flicker) {
+                        ctx.globalAlpha = 0.5;
+                        // Effetto distorsione
+                        ctx.filter = 'hue-rotate(180deg)';
+                    }
                 }
 
-                // Corpo del riccio (forma geometrica stilizzata)
-                // Glow effect
-                ctx.shadowBlur = gameState.boosting ? 30 : 15;
+                // Aura di potenza per super jump
+                if (this.superJumpCharge > 0) {
+                    const chargePercent = this.superJumpCharge / 100;
+                    ctx.save();
+                    ctx.globalAlpha = chargePercent * 0.5;
+                    
+                    // Aura pulsante
+                    for (let i = 0; i < 3; i++) {
+                        const scale = 1 + i * 0.3 + Math.sin(Date.now() * 0.01) * 0.1;
+                        const alpha = (1 - i / 3) * chargePercent;
+                        
+                        ctx.globalAlpha = alpha * 0.3;
+                        ctx.fillStyle = COLORS.accent;
+                        ctx.shadowBlur = 50;
+                        ctx.shadowColor = COLORS.accent;
+                        
+                        ctx.beginPath();
+                        ctx.arc(0, 0, this.width / 2 * scale, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
+
+                // Corpo del riccio dettagliato
+                ctx.shadowBlur = gameState.boosting ? 40 : 20;
                 ctx.shadowColor = gameState.boosting ? COLORS.accent : COLORS.primary;
                 
-                // Indicatore super jump
-                if (this.superJumpCharge > 0) {
-                    ctx.shadowBlur = 30 + this.superJumpCharge * 0.2;
-                    ctx.shadowColor = COLORS.accent;
+                // Base del corpo con pattern
+                const bodyGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.width / 2);
+                if (gameState.boosting) {
+                    // Gradiente arcobaleno per boost
+                    bodyGradient.addColorStop(0, `hsl(${Date.now() * 0.5 % 360}, 100%, 70%)`);
+                    bodyGradient.addColorStop(0.5, `hsl(${(Date.now() * 0.5 + 180) % 360}, 100%, 50%)`);
+                    bodyGradient.addColorStop(1, COLORS.dark);
+                } else {
+                    bodyGradient.addColorStop(0, COLORS.primary);
+                    bodyGradient.addColorStop(0.5, '#0099cc');
+                    bodyGradient.addColorStop(0.8, '#006699');
+                    bodyGradient.addColorStop(1, COLORS.dark);
                 }
 
-                // Corpo principale
-                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.width / 2);
-                gradient.addColorStop(0, gameState.boosting ? COLORS.accent : COLORS.primary);
-                gradient.addColorStop(0.7, gameState.boosting ? COLORS.secondary : '#0099cc');
-                gradient.addColorStop(1, COLORS.dark);
-
-                ctx.fillStyle = gradient;
+                ctx.fillStyle = bodyGradient;
                 ctx.beginPath();
                 ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Spikes (aculei)
-                ctx.strokeStyle = COLORS.white;
-                ctx.lineWidth = 2;
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2 + this.animationFrame * 0.01;
-                    const spikeLength = this.width / 2 + 5;
+                // Pattern interno tech
+                ctx.save();
+                ctx.clip();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.lineWidth = 1;
+                for (let i = -this.width; i < this.width; i += 5) {
                     ctx.beginPath();
-                    ctx.moveTo(
-                        Math.cos(angle) * this.width / 3,
-                        Math.sin(angle) * this.width / 3
-                    );
-                    ctx.lineTo(
-                        Math.cos(angle) * spikeLength,
-                        Math.sin(angle) * spikeLength
-                    );
+                    ctx.moveTo(i, -this.height);
+                    ctx.lineTo(i + 20, this.height);
                     ctx.stroke();
                 }
+                ctx.restore();
 
-                // Occhio
+                // Spikes animati e dettagliati
+                ctx.strokeStyle = COLORS.white;
+                ctx.fillStyle = COLORS.white;
+                
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2 + this.animationFrame * 0.01;
+                    const spikeLength = this.width / 2 + 8 + Math.sin(this.animationFrame * 0.05 + i) * 3;
+                    
+                    ctx.save();
+                    ctx.rotate(angle);
+                    
+                    // Spike con gradiente
+                    const spikeGradient = ctx.createLinearGradient(this.width / 3, 0, spikeLength, 0);
+                    spikeGradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                    spikeGradient.addColorStop(1, 'rgba(255, 255, 255, 0.2)');
+                    
+                    ctx.fillStyle = spikeGradient;
+                    ctx.beginPath();
+                    ctx.moveTo(this.width / 3, -2);
+                    ctx.lineTo(spikeLength, 0);
+                    ctx.lineTo(this.width / 3, 2);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+
+                // Faccia dettagliata
+                // Occhio principale
+                const eyeX = 8;
+                const eyeY = -5;
+                
+                // Sclera
                 ctx.fillStyle = COLORS.white;
                 ctx.beginPath();
-                ctx.arc(10, -5, 8, 0, Math.PI * 2);
+                ctx.ellipse(eyeX, eyeY, 10, 12, 0, 0, Math.PI * 2);
                 ctx.fill();
-
+                
+                // Iride con effetto
+                const irisGradient = ctx.createRadialGradient(eyeX + 2, eyeY - 2, 0, eyeX, eyeY, 6);
+                irisGradient.addColorStop(0, '#66ddff');
+                irisGradient.addColorStop(0.5, '#0099ff');
+                irisGradient.addColorStop(1, '#003366');
+                
+                ctx.fillStyle = irisGradient;
+                ctx.beginPath();
+                ctx.arc(eyeX + 1, eyeY, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Pupilla
                 ctx.fillStyle = COLORS.dark;
                 ctx.beginPath();
-                ctx.arc(12, -5, 4, 0, Math.PI * 2);
+                ctx.arc(eyeX + 2, eyeY, 3, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Riflesso
+                ctx.fillStyle = COLORS.white;
+                ctx.beginPath();
+                ctx.arc(eyeX + 3, eyeY - 2, 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Sopracciglio determinato
+                ctx.strokeStyle = COLORS.dark;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(eyeX - 5, eyeY - 10);
+                ctx.lineTo(eyeX + 8, eyeY - 8);
+                ctx.stroke();
+
+                // Effetti particellari durante movimento
+                if (this.jumping || Math.abs(this.velocityX) > 1) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.5;
+                    for (let i = 0; i < 3; i++) {
+                        const particleX = -10 - i * 5;
+                        const particleY = 10 + Math.sin(this.animationFrame * 0.2 + i) * 5;
+                        ctx.fillStyle = COLORS.primary;
+                        ctx.beginPath();
+                        ctx.arc(particleX, particleY, 2 - i * 0.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                }
 
                 ctx.restore();
             }
@@ -989,11 +1122,30 @@
             }
 
             drawSpike() {
-                ctx.fillStyle = COLORS.danger;
-                ctx.shadowBlur = 15;
+                // Animazione rotazione spike
+                ctx.save();
+                ctx.rotate(this.animationFrame * 2);
+                
+                // Ombra
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(3, -this.height / 2 + 5);
+                ctx.lineTo(-this.width / 2 + 3, this.height / 2 + 5);
+                ctx.lineTo(this.width / 2 + 3, this.height / 2 + 5);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Gradiente metallico
+                const spikeGradient = ctx.createLinearGradient(0, -this.height/2, 0, this.height/2);
+                spikeGradient.addColorStop(0, '#ff6666');
+                spikeGradient.addColorStop(0.5, COLORS.danger);
+                spikeGradient.addColorStop(1, '#cc0033');
+                
+                ctx.fillStyle = spikeGradient;
+                ctx.shadowBlur = 20;
                 ctx.shadowColor = COLORS.danger;
 
-                // Triangolo appuntito
+                // Triangolo appuntito principale
                 ctx.beginPath();
                 ctx.moveTo(0, -this.height / 2);
                 ctx.lineTo(-this.width / 2, this.height / 2);
@@ -1001,82 +1153,251 @@
                 ctx.closePath();
                 ctx.fill();
 
-                // Dettaglio metallico
+                // Dettaglio metallico con riflessi
                 ctx.strokeStyle = COLORS.white;
                 ctx.lineWidth = 2;
+                ctx.globalAlpha = 0.6;
                 ctx.stroke();
+                
+                // Riflesso centrale
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(0, -this.height / 2 + 5);
+                ctx.lineTo(-5, 0);
+                ctx.lineTo(5, 0);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
             }
 
             drawBarrier() {
-                // Barriera magnetica animata
+                // Barriera magnetica animata con effetti elettrici
                 const pulse = Math.sin(this.animationFrame) * 0.1 + 1;
+                const electricPhase = this.animationFrame * 5;
 
                 ctx.save();
                 ctx.scale(pulse, 1);
 
-                // Gradiente elettrico
+                // Campo di forza esterno
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = COLORS.secondary;
+                ctx.fillRect(-this.width/2 - 10, -this.height/2 - 10, this.width + 20, this.height + 20);
+
+                // Gradiente elettrico principale
+                ctx.globalAlpha = 1;
                 const gradient = ctx.createLinearGradient(-this.width/2, 0, this.width/2, 0);
                 gradient.addColorStop(0, COLORS.secondary);
-                gradient.addColorStop(0.5, COLORS.white);
+                gradient.addColorStop(0.25, COLORS.white);
+                gradient.addColorStop(0.5, COLORS.secondary);
+                gradient.addColorStop(0.75, COLORS.white);
                 gradient.addColorStop(1, COLORS.secondary);
 
                 ctx.fillStyle = gradient;
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = 30;
                 ctx.shadowColor = COLORS.secondary;
                 ctx.fillRect(-this.width/2, -this.height/2, this.width, this.height);
 
-                // Pattern elettrico
+                // Pattern elettrico animato
                 ctx.strokeStyle = COLORS.white;
                 ctx.lineWidth = 2;
                 ctx.setLineDash([5, 5]);
+                ctx.lineDashOffset = electricPhase;
                 ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+                ctx.setLineDash([]);
+
+                // Scariche elettriche
+                ctx.strokeStyle = COLORS.white;
+                ctx.lineWidth = 1;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = COLORS.white;
+                
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(-this.width/2, -this.height/2 + i * this.height/3);
+                    
+                    let x = -this.width/2;
+                    let y = -this.height/2 + i * this.height/3;
+                    
+                    while (x < this.width/2) {
+                        x += 5 + Math.random() * 10;
+                        y += (Math.random() - 0.5) * 20;
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+                    ctx.stroke();
+                }
 
                 ctx.restore();
             }
 
             drawHole() {
-                // Buco di rete
-                ctx.fillStyle = COLORS.background;
-                ctx.strokeStyle = COLORS.danger;
-                ctx.lineWidth = 3;
-
+                // Buco di rete con effetto vortice
+                ctx.save();
+                
+                // Ombra profonda
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.beginPath();
+                ctx.ellipse(3, 3, this.width/2 + 5, this.height/2 + 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Gradiente profondità
+                const holeGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.width/2);
+                holeGradient.addColorStop(0, '#000000');
+                holeGradient.addColorStop(0.7, '#220011');
+                holeGradient.addColorStop(1, COLORS.danger);
+                
+                ctx.fillStyle = holeGradient;
                 ctx.beginPath();
                 ctx.ellipse(0, 0, this.width/2, this.height/2, 0, 0, Math.PI * 2);
                 ctx.fill();
+                
+                // Bordo luminoso
+                ctx.strokeStyle = COLORS.danger;
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = COLORS.danger;
                 ctx.stroke();
 
-                // Effetto vortice
-                ctx.strokeStyle = `rgba(255, 51, 102, ${Math.sin(this.animationFrame * 2) * 0.5 + 0.5})`;
+                // Effetto vortice con spirali
+                ctx.strokeStyle = `rgba(255, 51, 102, ${Math.sin(this.animationFrame * 2) * 0.3 + 0.5})`;
                 ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.ellipse(0, 0, this.width/3, this.height/3, this.animationFrame, 0, Math.PI * 2);
-                ctx.stroke();
+                
+                for (let spiral = 0; spiral < 3; spiral++) {
+                    ctx.beginPath();
+                    for (let i = 0; i < 50; i++) {
+                        const angle = i * 0.2 + this.animationFrame + spiral * 2.09;
+                        const radius = i * 0.8;
+                        const x = Math.cos(angle) * radius;
+                        const y = Math.sin(angle) * radius * 0.5; // Ellittico
+                        
+                        if (radius < this.width/2) {
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+                
+                // Particelle aspirate
+                for (let i = 0; i < 5; i++) {
+                    const particleAngle = this.animationFrame * 3 + i * 1.26;
+                    const particleRadius = (Math.sin(this.animationFrame * 0.5 + i) * 0.5 + 0.5) * this.width/2;
+                    const px = Math.cos(particleAngle) * particleRadius;
+                    const py = Math.sin(particleAngle) * particleRadius * 0.5;
+                    
+                    ctx.fillStyle = COLORS.danger;
+                    ctx.globalAlpha = 1 - particleRadius / (this.width/2);
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
             }
 
             drawFirewall() {
-                // Firewall animato
+                // Firewall animato con fiamme digitali realistiche
                 const flameHeight = Math.sin(this.animationFrame * 3) * 10;
 
-                // Fiamme digitali
-                for (let i = -2; i <= 2; i++) {
-                    const offset = i * 10;
-                    const height = this.height + flameHeight + Math.sin(this.animationFrame * 5 + i) * 5;
-
-                    const gradient = ctx.createLinearGradient(0, this.height/2, 0, -height/2);
-                    gradient.addColorStop(0, COLORS.danger);
-                    gradient.addColorStop(0.5, COLORS.secondary);
-                    gradient.addColorStop(1, 'rgba(255, 90, 242, 0)');
-
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(offset - 5, this.height/2, 10, -height);
-                }
-
-                // Base del firewall
-                ctx.fillStyle = COLORS.dark;
+                // Base del firewall con gradiente metallico
+                ctx.fillStyle = '#1a1a2e';
+                ctx.fillRect(-this.width/2, this.height/2 - 15, this.width, 15);
+                
                 ctx.strokeStyle = COLORS.danger;
                 ctx.lineWidth = 2;
-                ctx.fillRect(-this.width/2, this.height/2 - 10, this.width, 10);
-                ctx.strokeRect(-this.width/2, this.height/2 - 10, this.width, 10);
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = COLORS.danger;
+                ctx.strokeRect(-this.width/2, this.height/2 - 15, this.width, 15);
+                
+                // Pattern griglia sulla base
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                for (let x = -this.width/2; x < this.width/2; x += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, this.height/2 - 15);
+                    ctx.lineTo(x, this.height/2);
+                    ctx.stroke();
+                }
+
+                // Fiamme digitali a strati
+                for (let layer = 0; layer < 3; layer++) {
+                    ctx.save();
+                    ctx.globalAlpha = 1 - layer * 0.3;
+                    
+                    for (let i = -3; i <= 3; i++) {
+                        const offset = i * 8;
+                        const individualHeight = this.height + flameHeight + 
+                            Math.sin(this.animationFrame * 5 + i * 2) * 8 +
+                            Math.sin(this.animationFrame * 7 + i * 3) * 5;
+                        
+                        // Fiamma principale
+                        const flameGradient = ctx.createLinearGradient(
+                            0, this.height/2,
+                            0, -individualHeight/2
+                        );
+                        
+                        if (layer === 0) {
+                            flameGradient.addColorStop(0, COLORS.danger);
+                            flameGradient.addColorStop(0.3, '#ff6600');
+                            flameGradient.addColorStop(0.6, COLORS.secondary);
+                            flameGradient.addColorStop(1, 'rgba(255, 90, 242, 0)');
+                        } else {
+                            flameGradient.addColorStop(0, '#ff6600');
+                            flameGradient.addColorStop(0.5, '#ffaa00');
+                            flameGradient.addColorStop(1, 'rgba(255, 170, 0, 0)');
+                        }
+
+                        ctx.fillStyle = flameGradient;
+                        
+                        // Forma fiamma con curve
+                        ctx.beginPath();
+                        ctx.moveTo(offset - 5, this.height/2);
+                        
+                        // Lato sinistro con curve
+                        ctx.quadraticCurveTo(
+                            offset - 8 + Math.sin(this.animationFrame * 4 + i) * 3,
+                            this.height/2 - individualHeight * 0.3,
+                            offset - 3 + Math.sin(this.animationFrame * 6 + i) * 4,
+                            -individualHeight/2
+                        );
+                        
+                        // Punta
+                        ctx.quadraticCurveTo(
+                            offset,
+                            -individualHeight/2 - 10,
+                            offset + 3 + Math.sin(this.animationFrame * 6 + i + 1) * 4,
+                            -individualHeight/2
+                        );
+                        
+                        // Lato destro con curve
+                        ctx.quadraticCurveTo(
+                            offset + 8 + Math.sin(this.animationFrame * 4 + i + 2) * 3,
+                            this.height/2 - individualHeight * 0.3,
+                            offset + 5,
+                            this.height/2
+                        );
+                        
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    
+                    ctx.restore();
+                }
+                
+                // Scintille
+                ctx.fillStyle = COLORS.accent;
+                for (let i = 0; i < 8; i++) {
+                    const sparkY = -Math.abs(Math.sin(this.animationFrame * 0.1 + i)) * this.height * 1.5;
+                    const sparkX = (Math.random() - 0.5) * this.width;
+                    const sparkSize = Math.random() * 3 + 1;
+                    
+                    ctx.globalAlpha = Math.random() * 0.8 + 0.2;
+                    ctx.beginPath();
+                    ctx.arc(sparkX, sparkY, sparkSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
 
             checkCollision(player) {
@@ -1170,28 +1491,134 @@
             draw() {
                 ctx.save();
                 ctx.globalAlpha = this.life;
-                ctx.fillStyle = this.color;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = this.color;
                 
                 if (this.type === 'dash') {
-                    // Trail rettangolare per dash
+                    // Trail rettangolare con gradiente per dash
+                    const gradient = ctx.createLinearGradient(
+                        this.x - this.size * 2, this.y,
+                        this.x + this.size * 2, this.y
+                    );
+                    gradient.addColorStop(0, 'transparent');
+                    gradient.addColorStop(0.5, this.color);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
                     ctx.fillRect(this.x - this.size * 2, this.y - this.size / 2, this.size * 4, this.size);
+                    
                 } else if (this.type === 'superJump') {
-                    // Stella per super jump
+                    // Stella rotante per super jump
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(Date.now() * 0.01);
+                    
+                    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.size);
+                    gradient.addColorStop(0, COLORS.white);
+                    gradient.addColorStop(0.5, this.color);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
                     ctx.beginPath();
                     for (let i = 0; i < 5; i++) {
                         const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
                         const radius = i % 2 === 0 ? this.size : this.size / 2;
                         const x = Math.cos(angle) * radius;
                         const y = Math.sin(angle) * radius;
-                        if (i === 0) ctx.moveTo(this.x + x, this.y + y);
-                        else ctx.lineTo(this.x + x, this.y + y);
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
                     }
                     ctx.closePath();
                     ctx.fill();
+                    ctx.restore();
+                    
+                } else if (this.type === 'boss') {
+                    // Esplosione epica per boss
+                    ctx.shadowBlur = 30;
+                    ctx.shadowColor = this.color;
+                    
+                    // Anello esplosivo
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 2 * (1 - this.life), 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    // Particelle centrali
+                    ctx.fillStyle = this.color;
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (Math.PI * 2 / 6) * i + this.life * Math.PI;
+                        const dist = this.size * (1 - this.life) * 3;
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x + Math.cos(angle) * dist,
+                            this.y + Math.sin(angle) * dist,
+                            this.size * 0.5, 0, Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                    
+                } else if (this.type === 'ring') {
+                    // Scintillio per anelli
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = this.color;
+                    
+                    const sparkle = Math.sin(Date.now() * 0.01 + this.x + this.y) * 0.5 + 0.5;
+                    ctx.fillStyle = this.color;
+                    ctx.globalAlpha = this.life * sparkle;
+                    
+                    // Forma a stella
+                    ctx.beginPath();
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (Math.PI / 2) * i;
+                        ctx.moveTo(this.x, this.y);
+                        ctx.lineTo(
+                            this.x + Math.cos(angle) * this.size,
+                            this.y + Math.sin(angle) * this.size
+                        );
+                    }
+                    ctx.stroke();
+                    
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                } else if (this.type === 'powerup') {
+                    // Effetto spirale per power-up
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(Date.now() * 0.005);
+                    
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (Math.PI * 2 / 3) * i;
+                        const gradient = ctx.createRadialGradient(
+                            Math.cos(angle) * this.size, Math.sin(angle) * this.size,
+                            0,
+                            Math.cos(angle) * this.size, Math.sin(angle) * this.size,
+                            this.size
+                        );
+                        gradient.addColorStop(0, COLORS.white);
+                        gradient.addColorStop(0.5, `hsl(${i * 120}, 100%, 50%)`);
+                        gradient.addColorStop(1, 'transparent');
+                        
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(Math.cos(angle) * this.size, Math.sin(angle) * this.size, this.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    
+                    ctx.restore();
+                    
                 } else {
-                    // Cerchio standard
+                    // Particella standard con glow
+                    ctx.fillStyle = this.color;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = this.color;
+                    
+                    const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+                    gradient.addColorStop(0, COLORS.white);
+                    gradient.addColorStop(0.3, this.color);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
                     ctx.beginPath();
                     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                     ctx.fill();
@@ -1909,6 +2336,9 @@
                 gameState.perfectJumps = 0;
                 gameState.invincible = true;
                 gameState.invincibilityTimer = 120; // 2 secondi
+                
+                // Camera shake
+                camera.shake = 20;
 
                 // Particelle di danno
                 for (let i = 0; i < 15; i++) {
@@ -1933,35 +2363,75 @@
                 // Clear canvas
                 ctx.clearRect(0, 0, screenWidth, screenHeight);
                 
-                // Effetto slow motion
+                // Effetto CRT/Scanline sottile
+                if (!isMobile || gameState.boosting) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.05;
+                    ctx.fillStyle = '#000';
+                    for (let y = 0; y < screenHeight; y += 4) {
+                        ctx.fillRect(0, y, screenWidth, 2);
+                    }
+                    ctx.restore();
+                }
+                
+                // Effetto slow motion con distorsione colore
                 if (gameState.slowMotionActive) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
                     ctx.fillStyle = 'rgba(255, 239, 0, 0.1)';
                     ctx.fillRect(0, 0, screenWidth, screenHeight);
+                    ctx.restore();
+                    
+                    // Effetto motion blur simulato
+                    ctx.save();
+                    ctx.globalAlpha = 0.2;
+                    ctx.filter = 'blur(2px)';
+                    ctx.drawImage(canvas, -5, 0, screenWidth + 10, screenHeight);
+                    ctx.filter = 'none';
+                    ctx.restore();
                 }
 
                 // Disegna sfondo
                 this.background.draw();
 
-                // Disegna terreno
+                // Disegna terreno con effetti
                 this.drawGround();
 
-                // Disegna elementi di gioco
-                this.rings.forEach(ring => ring.draw());
-                this.powerUps.forEach(powerUp => powerUp.draw());
-                this.obstacles.forEach(obstacle => obstacle.draw());
-                this.particles.forEach(particle => particle.draw());
+                // Ordina elementi per profondità (z-index simulato)
+                const drawables = [
+                    ...this.rings.map(r => ({obj: r, z: 1})),
+                    ...this.powerUps.map(p => ({obj: p, z: 2})),
+                    ...this.obstacles.map(o => ({obj: o, z: 3})),
+                    ...this.particles.map(p => ({obj: p, z: 0}))
+                ];
                 
-                // Disegna boss
+                // Disegna in ordine di profondità
+                drawables.sort((a, b) => a.z - b.z);
+                drawables.forEach(drawable => drawable.obj.draw());
+                
+                // Disegna boss con effetto speciale
                 if (this.boss && !this.boss.defeated) {
+                    // Aura boss
+                    if (this.boss.phase === 2) {
+                        ctx.save();
+                        ctx.globalCompositeOperation = 'screen';
+                        ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+                        ctx.fillRect(0, 0, screenWidth, screenHeight);
+                        ctx.restore();
+                    }
                     this.boss.draw();
                 }
                 
+                // Player sempre sopra
                 this.player.draw();
+                
+                // Effetti post-processing
+                this.applyPostProcessing();
 
-                // Disegna UI
+                // Disegna UI sopra tutto
                 this.drawUI();
 
-                // Schermate speciali
+                // Schermate speciali con transizioni
                 if (!gameState.running && !gameState.gameOver) {
                     this.drawStartScreen();
                 } else if (gameState.gameOver) {
@@ -1970,39 +2440,182 @@
                     this.drawPauseScreen();
                 }
             }
+            
+            applyPostProcessing() {
+                // Vignette effect
+                const vignette = ctx.createRadialGradient(
+                    screenWidth / 2, screenHeight / 2, 0,
+                    screenWidth / 2, screenHeight / 2, Math.max(screenWidth, screenHeight) * 0.7
+                );
+                vignette.addColorStop(0, 'transparent');
+                vignette.addColorStop(0.7, 'transparent');
+                vignette.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+                
+                ctx.fillStyle = vignette;
+                ctx.fillRect(0, 0, screenWidth, screenHeight);
+                
+                // Chromatic aberration simulata durante boost
+                if (gameState.boosting) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'screen';
+                    ctx.globalAlpha = 0.1;
+                    
+                    // Red channel shift
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(2, 0, screenWidth, screenHeight);
+                    
+                    // Blue channel shift
+                    ctx.fillStyle = '#0000ff';
+                    ctx.fillRect(-2, 0, screenWidth, screenHeight);
+                    
+                    ctx.restore();
+                }
+                
+                // Damage flash effect
+                if (gameState.invincible && gameState.invincibilityTimer > 100) {
+                    ctx.save();
+                    ctx.globalAlpha = (gameState.invincibilityTimer - 100) / 20 * 0.3;
+                    ctx.fillStyle = COLORS.danger;
+                    ctx.fillRect(0, 0, screenWidth, screenHeight);
+                    ctx.restore();
+                }
+                
+                // Screen shake durante eventi importanti
+                if (camera && camera.shake > 0) {
+                    ctx.save();
+                    ctx.translate(
+                        (Math.random() - 0.5) * camera.shake,
+                        (Math.random() - 0.5) * camera.shake
+                    );
+                    camera.shake *= 0.9;
+                    ctx.restore();
+                }
+            }
 
             drawGround() {
                 const groundY = screenHeight - 100;
                 
-                // Linea principale
+                // Effetto prospettiva per il terreno
+                ctx.save();
+                
+                // Gradiente terreno
+                const groundGradient = ctx.createLinearGradient(0, groundY - 50, 0, screenHeight);
+                groundGradient.addColorStop(0, 'transparent');
+                groundGradient.addColorStop(0.3, `${COLORS.primary}22`);
+                groundGradient.addColorStop(1, `${COLORS.primary}44`);
+                
+                ctx.fillStyle = groundGradient;
+                ctx.fillRect(0, groundY - 50, screenWidth, screenHeight - groundY + 50);
+                
+                // Linea principale con glow dinamico
+                const glowIntensity = gameState.boosting ? 40 : 20;
                 ctx.strokeStyle = COLORS.primary;
-                ctx.lineWidth = 3;
-                ctx.shadowBlur = 20;
+                ctx.lineWidth = 4;
+                ctx.shadowBlur = glowIntensity;
                 ctx.shadowColor = COLORS.primary;
+                
+                // Linea principale animata
                 ctx.beginPath();
                 ctx.moveTo(0, groundY);
-                ctx.lineTo(screenWidth, groundY);
-                ctx.stroke();
-
-                // Griglia digitale
-                ctx.strokeStyle = `${COLORS.primary}33`;
-                ctx.lineWidth = 1;
-                ctx.shadowBlur = 0;
                 
-                // Linee verticali
-                for (let x = (gameState.distance % 50) * -1; x < screenWidth; x += 50) {
+                // Onde sinusoidali durante boost
+                if (gameState.boosting) {
+                    for (let x = 0; x <= screenWidth; x += 10) {
+                        const wave = Math.sin((x + gameState.distance * 0.01) * 0.02) * 5;
+                        ctx.lineTo(x, groundY + wave);
+                    }
+                } else {
+                    ctx.lineTo(screenWidth, groundY);
+                }
+                ctx.stroke();
+                
+                // Linee secondarie con effetto profondità
+                ctx.strokeStyle = `${COLORS.primary}66`;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 10;
+                
+                for (let i = 1; i <= 3; i++) {
+                    ctx.globalAlpha = 1 - i * 0.25;
                     ctx.beginPath();
-                    ctx.moveTo(x, groundY);
-                    ctx.lineTo(x, screenHeight);
+                    ctx.moveTo(0, groundY + i * 20);
+                    ctx.lineTo(screenWidth, groundY + i * 20);
                     ctx.stroke();
                 }
+                
+                ctx.restore();
 
-                // Linee orizzontali
+                // Griglia digitale prospettica
+                ctx.save();
+                ctx.strokeStyle = `${COLORS.primary}33`;
+                ctx.lineWidth = 1;
+                ctx.globalAlpha = 0.5;
+                
+                // Linee verticali con prospettiva
+                const vanishingPointY = screenHeight * 0.4;
+                const gridSpacing = 50;
+                const scrollOffset = (gameState.distance % gridSpacing) * -1;
+                
+                for (let x = scrollOffset; x < screenWidth; x += gridSpacing) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, groundY);
+                    
+                    // Calcola punto di fuga
+                    const centerX = screenWidth / 2;
+                    const perspectiveX = centerX + (x - centerX) * 0.2;
+                    ctx.lineTo(perspectiveX, vanishingPointY);
+                    
+                    ctx.stroke();
+                }
+                
+                // Linee orizzontali con fade
                 for (let y = groundY; y < screenHeight; y += 20) {
+                    const alpha = 1 - (y - groundY) / (screenHeight - groundY);
+                    ctx.globalAlpha = alpha * 0.3;
+                    
                     ctx.beginPath();
                     ctx.moveTo(0, y);
                     ctx.lineTo(screenWidth, y);
                     ctx.stroke();
+                }
+                
+                ctx.restore();
+                
+                // Particelle di energia sul terreno
+                if (gameState.boosting || Math.random() < 0.1) {
+                    const particleX = Math.random() * screenWidth;
+                    const particleY = groundY + Math.random() * 50;
+                    
+                    ctx.save();
+                    ctx.fillStyle = gameState.boosting ? COLORS.accent : COLORS.primary;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+                    
+                    ctx.beginPath();
+                    ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+                
+                // Effetto velocità
+                if (gameState.speed > GAME_CONFIG.baseSpeed * 1.5) {
+                    ctx.save();
+                    ctx.strokeStyle = COLORS.white;
+                    ctx.lineWidth = 2;
+                    ctx.globalAlpha = 0.1;
+                    
+                    for (let i = 0; i < 5; i++) {
+                        const lineX = Math.random() * screenWidth;
+                        const lineLength = 50 + Math.random() * 100;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(lineX, groundY - 20);
+                        ctx.lineTo(lineX - lineLength, groundY - 20);
+                        ctx.stroke();
+                    }
+                    
+                    ctx.restore();
                 }
             }
 
