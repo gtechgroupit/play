@@ -167,7 +167,30 @@
             transform: scale(0.9);
         }
 
-        /* Checkpoint notification */
+        /* Combo message */
+        .combo-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff00;
+            text-shadow: 0 0 20px #00ff00;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 30;
+        }
+        
+        @keyframes comboMessage {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+        }
+        
+        .combo-message.show {
+            animation: comboMessage 1s ease-out;
+        }
         #checkpoint {
             position: absolute;
             top: 50%;
@@ -245,6 +268,9 @@
         
         <!-- Notifica checkpoint -->
         <div id="checkpoint">CHECKPOINT!</div>
+        
+        <!-- Combo message -->
+        <div id="comboMessage" class="combo-message"></div>
     </div>
     
     <!-- Menu iniziale -->
@@ -263,7 +289,10 @@
         <h2>GAME OVER</h2>
         <p style="margin: 20px 0; font-size: 1.2em;">
             Final Score: <span id="finalScore">0</span><br>
-            Distance: <span id="finalDistance">0</span>m
+            Distance: <span id="finalDistance">0</span>m<br>
+            Max Combo: <span id="finalMaxCombo">0</span><br>
+            Near Misses: <span id="finalNearMisses">0</span><br>
+            Boss Defeated: <span id="bossDefeated">NO</span>
         </p>
         <button class="button" onclick="restartGame()">RESTART</button>
         <button class="button" onclick="location.href='../index.php'">MAIN MENU</button>
@@ -300,6 +329,20 @@
         let lastCheckpoint = 0;
         let animationId = null;
         let lastTime = 0;
+        
+        // Sistema combo
+        let combo = 0;
+        let comboTimer = 0;
+        let maxCombo = 0;
+        let nearMisses = 0;
+        
+        // Boss system
+        let boss = null;
+        let nextBossScore = 5000;
+        
+        // Audio context
+        let audioContext = null;
+        let masterGain = null;
         
         // Player
         const player = {
@@ -350,7 +393,139 @@
         let touchStartX = null;
         let moveDirection = 0;
         
-        // ===== GESTIONE INPUT =====
+        // ===== SISTEMA AUDIO =====
+        
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioContext.createGain();
+                masterGain.gain.value = 0.3;
+                masterGain.connect(audioContext.destination);
+            }
+        }
+        
+        function playSound(type, frequency = 440, duration = 0.1) {
+            if (!audioContext) return;
+            
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            
+            oscillator.connect(gain);
+            gain.connect(masterGain);
+            
+            switch(type) {
+                case 'move':
+                    oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.05);
+                    gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
+                    duration = 0.05;
+                    break;
+                    
+                case 'powerup':
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    duration = 0.2;
+                    break;
+                    
+                case 'hit':
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.setValueAtTime(200, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    duration = 0.3;
+                    break;
+                    
+                case 'combo':
+                    oscillator.frequency.setValueAtTime(600 + combo * 50, audioContext.currentTime);
+                    gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    duration = 0.1;
+                    break;
+                    
+                case 'boss':
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(150, audioContext.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(100, audioContext.currentTime + 0.2);
+                    gain.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    duration = 0.5;
+                    break;
+            }
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+        
+        // Background music generator
+        let musicNodes = [];
+        
+        function startBackgroundMusic() {
+            if (!audioContext) return;
+            
+            // Bass line
+            const bassOsc = audioContext.createOscillator();
+            const bassGain = audioContext.createGain();
+            bassOsc.type = 'triangle';
+            bassOsc.frequency.setValueAtTime(55, audioContext.currentTime); // A1
+            bassGain.gain.setValueAtTime(0.1, audioContext.currentTime);
+            
+            const bassLFO = audioContext.createOscillator();
+            const bassLFOGain = audioContext.createGain();
+            bassLFO.frequency.setValueAtTime(0.5, audioContext.currentTime);
+            bassLFOGain.gain.setValueAtTime(5, audioContext.currentTime);
+            
+            bassLFO.connect(bassLFOGain);
+            bassLFOGain.connect(bassOsc.frequency);
+            bassOsc.connect(bassGain);
+            bassGain.connect(masterGain);
+            
+            bassOsc.start();
+            bassLFO.start();
+            
+            musicNodes.push(bassOsc, bassLFO);
+            
+            // Arpeggio
+            const notes = [440, 523.25, 659.25, 783.99]; // A4, C5, E5, G5
+            let noteIndex = 0;
+            
+            const playArpeggio = () => {
+                if (!gameRunning) return;
+                
+                const arpOsc = audioContext.createOscillator();
+                const arpGain = audioContext.createGain();
+                
+                arpOsc.type = 'sine';
+                arpOsc.frequency.setValueAtTime(notes[noteIndex], audioContext.currentTime);
+                arpGain.gain.setValueAtTime(0.05, audioContext.currentTime);
+                arpGain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+                
+                arpOsc.connect(arpGain);
+                arpGain.connect(masterGain);
+                
+                arpOsc.start();
+                arpOsc.stop(audioContext.currentTime + 0.5);
+                
+                noteIndex = (noteIndex + 1) % notes.length;
+                
+                setTimeout(playArpeggio, 150);
+            };
+            
+            playArpeggio();
+        }
+        
+        function stopBackgroundMusic() {
+            musicNodes.forEach(node => {
+                try {
+                    node.stop();
+                } catch(e) {}
+            });
+            musicNodes = [];
+        }
         
         // Keyboard
         document.addEventListener('keydown', (e) => {
@@ -410,6 +585,7 @@
                 
                 // Effetto particelle movimento
                 createMoveParticles();
+                playSound('move');
             }
         }
         
@@ -426,6 +602,16 @@
             
             // Effetto boost
             createBoostParticles();
+            
+            // Se c'è un boss, il boost può danneggiarlo passandoci attraverso
+            if (boss && !boss.defeated) {
+                setTimeout(() => {
+                    if (boss && Math.abs(player.lane - 1) <= 1) { // Boss al centro
+                        damageBoss(20);
+                        score += 1000;
+                    }
+                }, 500);
+            }
         }
         
         // ===== INIZIALIZZAZIONE GIOCO =====
@@ -439,6 +625,16 @@
             obstacles = [];
             particles = [];
             powerUps = [];
+            
+            // Reset combo system
+            combo = 0;
+            comboTimer = 0;
+            maxCombo = 0;
+            nearMisses = 0;
+            
+            // Reset boss
+            boss = null;
+            nextBossScore = 5000;
             
             player.lane = 1;
             player.targetLane = 1;
@@ -458,11 +654,14 @@
         
         function startGame() {
             initGame();
+            initAudio();
             gameRunning = true;
             
             document.getElementById('startMenu').style.display = 'none';
             document.getElementById('gameStats').style.display = 'block';
             document.getElementById('gameOverMenu').style.display = 'none';
+            
+            startBackgroundMusic();
             
             lastTime = performance.now();
             gameLoop();
@@ -500,9 +699,24 @@
                 speed = Math.min(speed + acceleration * deltaTime * timeScale, maxSpeed);
             }
             
-            // Update distanza e score
+            // Update distanza e score con combo multiplier
             distance += speed * 0.1 * timeScale;
-            score += Math.floor(speed * 0.5 * player.scoreMultiplier);
+            const comboMultiplier = Math.min(1 + combo * 0.5, 10); // Max x10
+            score += Math.floor(speed * 0.5 * player.scoreMultiplier * comboMultiplier);
+            
+            // Update combo timer
+            if (comboTimer > 0) {
+                comboTimer -= timeScale;
+                if (comboTimer <= 0) {
+                    if (combo > maxCombo) maxCombo = combo;
+                    combo = 0;
+                }
+            }
+            
+            // Check boss spawn
+            if (!boss && score >= nextBossScore) {
+                spawnBoss();
+            }
             
             // Update player
             updatePlayer();
@@ -512,6 +726,44 @@
             
             // Update power-ups
             updatePowerUps(timeScale);
+            
+            // Update boss
+            if (boss) {
+                updateBoss(timeScale);
+            }
+            
+            // Update boss projectiles se esistono
+            if (boss && boss.projectiles) {
+                boss.projectiles = boss.projectiles.filter(projectile => {
+                    projectile.z -= (speed + 5) * timeScale;
+                    
+                    // Check collisione con player
+                    if (!player.invulnerable && !player.shield && 
+                        projectile.z < 100 && projectile.z > -100 &&
+                        projectile.lane === player.lane) {
+                        
+                        if (player.shield) {
+                            player.shield = false;
+                            createShieldBreakParticles();
+                        } else {
+                            lives--;
+                            player.invulnerable = true;
+                            player.invulnerableTime = 120;
+                            createExplosionParticles(player.x, player.y);
+                            playSound('hit');
+                            
+                            if (lives <= 0) {
+                                gameOver();
+                            }
+                            updateLivesDisplay();
+                        }
+                        
+                        return false;
+                    }
+                    
+                    return projectile.z > -200;
+                });
+            }
             
             // Update particelle
             updateParticles();
@@ -586,7 +838,8 @@
                     lane: lane,
                     z: tunnel.depth,
                     type: type,
-                    hit: false
+                    hit: false,
+                    nearMissChecked: false
                 });
             }
             
@@ -594,8 +847,29 @@
             obstacles = obstacles.filter(obstacle => {
                 obstacle.z -= speed * timeScale;
                 
+                // Check near miss per combo
+                if (!obstacle.nearMissChecked && obstacle.z < 0 && obstacle.z > -150) {
+                    if (obstacle.lane !== player.lane) {
+                        // Near miss!
+                        obstacle.nearMissChecked = true;
+                        nearMisses++;
+                        combo++;
+                        comboTimer = 120; // 2 secondi per mantenere il combo
+                        score += 50 * combo;
+                        
+                        // Effetto visivo near miss
+                        createNearMissEffect(obstacle.lane);
+                        playSound('combo');
+                        
+                        // Mostra messaggio combo
+                        const messages = ['NICE!', 'AWESOME!', 'PERFECT!', 'INCREDIBLE!', 'UNSTOPPABLE!'];
+                        const messageIndex = Math.min(Math.floor(combo / 3), messages.length - 1);
+                        showComboMessage(messages[messageIndex]);
+                    }
+                }
+                
                 // Check collisione
-                if (!obstacle.hit && !player.invulnerable && !player.shield && obstacle.z < 100 && obstacle.z > -100) {
+                if (!obstacle.hit && obstacle.z < 100 && obstacle.z > -100) {
                     if (obstacle.lane === player.lane) {
                         // Collisione!
                         obstacle.hit = true;
@@ -604,19 +878,26 @@
                             // Lo scudo protegge
                             player.shield = false;
                             createShieldBreakParticles();
-                        } else {
+                            playSound('hit');
+                        } else if (!player.invulnerable) {
                             lives--;
                             player.invulnerable = true;
                             player.invulnerableTime = 120; // 2 secondi
                             
+                            // Reset combo
+                            if (combo > maxCombo) maxCombo = combo;
+                            combo = 0;
+                            comboTimer = 0;
+                            
                             createExplosionParticles(player.x, player.y);
+                            playSound('hit');
                             
                             if (lives <= 0) {
                                 gameOver();
                             }
+                            
+                            updateLivesDisplay();
                         }
-                        
-                        updateLivesDisplay();
                     }
                 }
                 
@@ -660,6 +941,8 @@
         }
         
         function collectPowerUp(type) {
+            playSound('powerup');
+            
             switch(type) {
                 case 'speedBoost':
                     player.boost = true;
@@ -728,6 +1011,63 @@
             // Disegna tunnel
             drawTunnel();
             
+            // Disegna boss se presente
+            if (boss && !boss.defeated) {
+                drawBoss();
+                
+                // Disegna proiettili boss
+                if (boss.projectiles) {
+                    boss.projectiles.forEach(projectile => {
+                        const lanePositions = [-100, 0, 100];
+                        const scale = 1 / (1 + projectile.z / 100);
+                        const x = lanePositions[projectile.lane] * scale;
+                        const y = 0;
+                        const size = 20 * scale;
+                        const alpha = Math.min(1, 1 - (projectile.z / tunnel.depth));
+                        
+                        ctx.save();
+                        ctx.globalAlpha = alpha;
+                        
+                        switch(projectile.type) {
+                            case 'laser':
+                                ctx.strokeStyle = '#ff0000';
+                                ctx.lineWidth = size;
+                                ctx.shadowBlur = 30;
+                                ctx.shadowColor = '#ff0000';
+                                ctx.beginPath();
+                                ctx.moveTo(x, -size * 5);
+                                ctx.lineTo(x, size * 5);
+                                ctx.stroke();
+                                break;
+                                
+                            case 'orb':
+                                ctx.fillStyle = '#ff6600';
+                                ctx.shadowBlur = 20;
+                                ctx.shadowColor = '#ff6600';
+                                ctx.beginPath();
+                                ctx.arc(x, y, size, 0, Math.PI * 2);
+                                ctx.fill();
+                                break;
+                                
+                            case 'wave':
+                                ctx.strokeStyle = '#ffff00';
+                                ctx.lineWidth = size/2;
+                                ctx.shadowBlur = 20;
+                                ctx.shadowColor = '#ffff00';
+                                ctx.beginPath();
+                                ctx.moveTo(x - size * 2, y);
+                                for (let i = -size * 2; i <= size * 2; i += 5) {
+                                    ctx.lineTo(x + i, y + Math.sin(i * 0.1 + Date.now() * 0.01) * size);
+                                }
+                                ctx.stroke();
+                                break;
+                        }
+                        
+                        ctx.restore();
+                    });
+                }
+            }
+            
             // Disegna power-ups
             drawPowerUps();
             
@@ -754,6 +1094,9 @@
             
             // UI per power-up attivi
             drawActivePowerUps();
+            
+            // Disegna combo UI
+            drawComboUI();
         }
         
         function drawTunnel() {
@@ -1057,6 +1400,125 @@
             ctx.restore();
         }
         
+        function drawBoss() {
+            if (!boss) return;
+            
+            ctx.save();
+            
+            // Posizione boss
+            ctx.translate(boss.x, boss.y - 100);
+            
+            // Fase determina colore
+            const colors = ['#ff0066', '#ff6600', '#ff0000'];
+            const color = colors[boss.phase - 1];
+            
+            // Corpo principale
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = color;
+            
+            // Forma geometrica complessa
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const angle = (Math.PI * 2 / 8) * i;
+                const radius = boss.size + Math.sin(Date.now() * 0.01 + i) * 10;
+                const x = Math.cos(angle) * radius;
+                const y = Math.sin(angle) * radius;
+                
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Core centrale
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, boss.size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Occhio centrale
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(0, 0, boss.size * 0.2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Barra vita boss
+            ctx.restore();
+            
+            // Health bar
+            const barWidth = 300;
+            const barHeight = 20;
+            const barX = canvas.width/2 - barWidth/2;
+            const barY = 50;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            ctx.fillStyle = color;
+            ctx.fillRect(barX, barY, barWidth * (boss.health / boss.maxHealth), barHeight);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(barX, barY, barWidth, barHeight);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('CYBER GUARDIAN - PHASE ' + boss.phase, canvas.width/2, barY - 10);
+        }
+        
+        function drawComboUI() {
+            if (combo > 0) {
+                ctx.save();
+                
+                // Combo counter
+                ctx.font = `bold ${30 + combo * 2}px monospace`;
+                ctx.textAlign = 'right';
+                ctx.fillStyle = `hsl(${combo * 20}, 100%, 50%)`;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = ctx.fillStyle;
+                
+                ctx.fillText(`COMBO x${combo}`, canvas.width - 20, 100);
+                
+                // Combo timer bar
+                if (comboTimer > 0) {
+                    const barWidth = 200;
+                    const barHeight = 10;
+                    const barX = canvas.width - barWidth - 20;
+                    const barY = 110;
+                    
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(barX, barY, barWidth, barHeight);
+                    
+                    ctx.fillStyle = `hsl(${combo * 20}, 100%, 50%)`;
+                    ctx.fillRect(barX, barY, barWidth * (comboTimer / 120), barHeight);
+                    
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(barX, barY, barWidth, barHeight);
+                }
+                
+                // Near misses counter
+                ctx.font = '16px monospace';
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText(`Near Misses: ${nearMisses}`, canvas.width - 20, 140);
+                
+                ctx.restore();
+            }
+            
+            // Max combo record
+            if (maxCombo > 0) {
+                ctx.font = '14px monospace';
+                ctx.fillStyle = '#888888';
+                ctx.textAlign = 'right';
+                ctx.fillText(`Max Combo: ${maxCombo}`, canvas.width - 20, canvas.height - 20);
+            }
+        }
+        
         // ===== EFFETTI PARTICELLE =====
         
         function createMoveParticles() {
@@ -1174,6 +1636,80 @@
             }
         }
         
+        function createNearMissEffect(lane) {
+            const laneX = [-100, 0, 100][lane];
+            for (let i = 0; i < 10; i++) {
+                particles.push({
+                    x: laneX + (Math.random() - 0.5) * 20,
+                    y: player.y - canvas.height/2,
+                    z: 0,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3,
+                    size: 5 + Math.random() * 5,
+                    color: '#00ff00',
+                    alpha: 1,
+                    life: 30,
+                    maxLife: 30
+                });
+            }
+        }
+        
+        function createBossSpawnEffect() {
+            // Effetto spawn boss epico
+            for (let i = 0; i < 50; i++) {
+                const angle = (Math.PI * 2 / 50) * i;
+                const speed = 10;
+                
+                particles.push({
+                    x: 0,
+                    y: -100,
+                    z: tunnel.depth - 300,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: 15,
+                    color: '#ff0066',
+                    alpha: 1,
+                    life: 60,
+                    maxLife: 60
+                });
+            }
+        }
+        
+        function createPhaseChangeEffect() {
+            // Effetto cambio fase boss
+            for (let i = 0; i < 30; i++) {
+                particles.push({
+                    x: boss.x + (Math.random() - 0.5) * boss.size * 2,
+                    y: boss.y - 100 + (Math.random() - 0.5) * boss.size * 2,
+                    z: 0,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    size: 10 + Math.random() * 10,
+                    color: ['#ff0066', '#ff6600', '#ff0000'][boss.phase - 1],
+                    alpha: 1,
+                    life: 40,
+                    maxLife: 40
+                });
+            }
+        }
+        
+        function createBossHitEffect() {
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: boss.x + (Math.random() - 0.5) * boss.size,
+                    y: boss.y - 100 + (Math.random() - 0.5) * boss.size,
+                    z: 0,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: (Math.random() - 0.5) * 5,
+                    size: 5 + Math.random() * 10,
+                    color: '#ffffff',
+                    alpha: 1,
+                    life: 20,
+                    maxLife: 20
+                });
+            }
+        }
+        
         // ===== GESTIONE UI E CHECKPOINT =====
         
         function updateUI() {
@@ -1220,10 +1756,21 @@
             }, 2000);
         }
         
+        function showComboMessage(text) {
+            const message = document.getElementById('comboMessage');
+            message.textContent = text;
+            message.classList.add('show');
+            
+            setTimeout(() => {
+                message.classList.remove('show');
+            }, 1000);
+        }
+        
         // ===== GAME OVER =====
         
         function gameOver() {
             gameRunning = false;
+            stopBackgroundMusic();
             
             if (animationId) {
                 cancelAnimationFrame(animationId);
@@ -1231,6 +1778,9 @@
             
             document.getElementById('finalScore').textContent = Math.floor(score);
             document.getElementById('finalDistance').textContent = Math.floor(distance);
+            document.getElementById('finalMaxCombo').textContent = Math.max(combo, maxCombo);
+            document.getElementById('finalNearMisses').textContent = nearMisses;
+            document.getElementById('bossDefeated').textContent = boss && boss.defeated ? 'YES' : 'NO';
             document.getElementById('gameOverMenu').style.display = 'block';
         }
         
@@ -1244,7 +1794,15 @@
             e.preventDefault();
         });
         
-        // Previeni doppio tap zoom
+        // Inizializza audio al primo click/touch
+        document.addEventListener('click', initAudioOnce);
+        document.addEventListener('touchstart', initAudioOnce);
+        
+        function initAudioOnce() {
+            initAudio();
+            document.removeEventListener('click', initAudioOnce);
+            document.removeEventListener('touchstart', initAudioOnce);
+        }
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (e) => {
             const now = Date.now();
